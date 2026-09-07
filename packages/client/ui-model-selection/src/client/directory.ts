@@ -6,6 +6,7 @@
  */
 import type {
   ModelCatalogFailure, ModelProviderGroup, ModelSelection, ModelSelectionProjection,
+  PromptProfileCatalogValue, PromptProfileDefinition, PromptProfileProjection, PromptProfileSelection,
 } from '@deepseek-ai/dsh-api-session-controller/types'
 import type { SessionId } from '@deepseek-ai/dsh-api-remotes/client'
 import type { TypertClientRemote } from '@deepseek-ai/dsh-typert-protocol'
@@ -33,21 +34,37 @@ export interface ModelDirectoryState {
   status: 'idle' | 'loading' | 'ready' | 'selecting' | 'error'
   /** Whole-request or selection failure text; null when none. */
   error: string | null
+  /** Prompt Profile definitions available independently of provider routes. */
+  promptProfiles: readonly PromptProfileDefinition[]
+  /** Auto or exact immutable revision selected for the next request. */
+  promptProfileSelection: PromptProfileSelection
+  /** Profile Auto currently resolves to for the selected provider. */
+  effectivePromptProfile: PromptProfileDefinition | null
 }
 
 /** One session's shared directory controller; disposed with the session scope. */
 export class ModelDirectory {
   /** The shared snapshot both entries render from (uSES-safe store). */
   readonly store: SnapshotStore<ModelDirectoryState> = createSnapshotStore<ModelDirectoryState>({
-    current: null, routable: null, groups: [], failures: [], status: 'idle', error: null,
+    current: null,
+    routable: null,
+    groups: [],
+    failures: [],
+    status: 'idle',
+    error: null,
+    promptProfiles: [],
+    promptProfileSelection: { mode: 'auto' },
+    effectivePromptProfile: null,
   })
 
   /** Latest selection operation wins; an older response never overwrites a newer one. */
   private generation = 0
   private disposed = false
   private resolved = false
+  private profileCatalog: PromptProfileCatalogValue | null = null
   private readonly unsubscribeCatalog: () => void
   private readonly unsubscribeSelection: () => void
+  private readonly unsubscribePromptProfile: () => void
 
   /**
    * @param sessions - the session wire face (captured from the plugin's root connection).
@@ -57,14 +74,17 @@ export class ModelDirectory {
    * @param projected - durable model selection projected from Session history.
    */
   constructor(
-    private readonly sessions: Pick<TypertClientRemote['session'], 'selectModel'>,
+    private readonly sessions: Pick<TypertClientRemote['session'],
+      'selectModel' | 'promptProfileCatalog' | 'selectPromptProfile'>,
     private readonly sessionId: SessionId,
     private readonly available: () => boolean,
     private readonly catalog: ModelCatalogDirectory,
     private readonly projected: ObservableSnapshot<unknown>,
+    private readonly projectedPromptProfile: ObservableSnapshot<unknown>,
   ) {
     this.unsubscribeCatalog = catalog.store.subscribe(() => { this.syncInputs() })
     this.unsubscribeSelection = projected.subscribe(() => { this.syncInputs() })
+    this.unsubscribePromptProfile = projectedPromptProfile.subscribe(() => { this.syncInputs() })
     this.syncInputs()
   }
 
@@ -74,7 +94,14 @@ export class ModelDirectory {
    */
   async load(): Promise<ModelDirectoryState> {
     this.assertAvailable()
-    await this.catalog.load()
+    const [, profileResult] = await Promise.all([
+      this.catalog.load(),
+      this.sessions.promptProfileCatalog(),
+    ])
+    if (!profileResult.ok) {
+      throw new Error(`${profileResult.error.code}: ${profileResult.error.message}`)
+    }
+    this.profileCatalog = profileResult.value
     this.syncInputs()
     return this.store.getSnapshot()
   }
@@ -109,6 +136,28 @@ export class ModelDirectory {
     this.syncInputs()
   }
 
+  /** Select Auto or one immutable Prompt Profile revision. */
+  async selectPromptProfile(selection: PromptProfileSelection): Promise<void> {
+    this.assertAvailable()
+    const generation = ++this.generation
+    this.store.update((state) => { state.status = 'selecting'; state.error = null })
+    const result = await this.sessions.selectPromptProfile({ sessionId: this.sessionId, selection })
+    if (this.disposed || generation !== this.generation) return
+    if (!result.ok) {
+      this.store.update((state) => {
+        state.status = 'error'
+        state.error = `${result.error.code}: ${result.error.message}`
+      })
+      throw new Error(`session.selectPromptProfile failed: ${result.error.code}: ${result.error.message}`)
+    }
+    this.store.update((state) => {
+      state.promptProfileSelection = result.value.selected
+      state.status = 'ready'
+      state.error = null
+    })
+    this.syncInputs()
+  }
+
   /**
    * Invalidate an in-flight selection response from the previous Host generation.
    */
@@ -125,6 +174,7 @@ export class ModelDirectory {
   /** Scope teardown: late settlements lose write access to the store. */
   dispose(): void {
     this.disposed = true
+    this.unsubscribePromptProfile()
     this.unsubscribeSelection()
     this.unsubscribeCatalog()
   }
@@ -156,10 +206,23 @@ export class ModelDirectory {
         failures: [],
         status: catalog.status === 'error' ? 'error' : 'loading',
         error: catalog.error,
+        promptProfiles: [],
+        promptProfileSelection: { mode: 'auto' },
+        effectivePromptProfile: null,
       })
       return
     }
     const current = projected.next ?? catalog.value.default
+    const promptProjection = promptProfileProjection(this.projectedPromptProfile.getSnapshot())
+    const promptSelection = promptProjection?.next ?? { mode: 'auto' as const }
+    const profileCatalog = this.profileCatalog
+    const profileId = promptSelection.mode === 'manual'
+      ? promptSelection.profileId
+      : profileCatalog?.defaultRules.find(rule => rule.providers === '*'
+        || rule.providers.includes(current.provider))?.profileId
+    const effectivePromptProfile = profileId === undefined
+      ? null
+      : profileCatalog?.profiles.find(profile => profile.id === profileId) ?? null
     this.resolved = true
     this.store.set({
       current,
@@ -170,10 +233,17 @@ export class ModelDirectory {
         ? 'selecting'
         : 'ready',
       error: null,
+      promptProfiles: profileCatalog?.profiles ?? [],
+      promptProfileSelection: promptSelection,
+      effectivePromptProfile,
     })
   }
 }
 
 function modelSelectionProjection(value: unknown): ModelSelectionProjection | undefined {
   return value === undefined ? undefined : value as ModelSelectionProjection
+}
+
+function promptProfileProjection(value: unknown): PromptProfileProjection | undefined {
+  return value === undefined ? undefined : value as PromptProfileProjection
 }

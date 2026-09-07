@@ -10,7 +10,23 @@ import type { SessionId, SessionSeqCursor } from '@deepseek-ai/dsh-session/types
 import type { SessionProjectionMap } from '@deepseek-ai/dsh-session-projection/types'
 import type { JobId } from '@deepseek-ai/dsh-jobs/brand'
 import type { JsonValue } from '@deepseek-ai/dsh-util-values'
+import type {
+  PromptProfileDefaultRule,
+  PromptProfileDefinition,
+  PromptProfileDraft,
+  PromptProfileId,
+  PromptProfileSelection,
+} from '@deepseek-ai/dsh-prompt-profiles/types'
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
+
+export type {
+  PromptProfileDefaultRule,
+  PromptProfileDefinition,
+  PromptProfileDraft,
+  PromptProfileId,
+  PromptProfileProjection,
+  PromptProfileSelection,
+} from '@deepseek-ai/dsh-prompt-profiles/types'
 
 declare module '@deepseek-ai/dsh-session-projection/types' {
   interface SessionProjectionStateMap {
@@ -277,6 +293,50 @@ export interface SessionSelectModelRequest extends ModelSelection {
 /** Accepted model selection after Host resolution. */
 export interface SessionSelectModelValue {
   readonly selected: ModelSelection
+}
+
+/** Session Prompt Profile selection request. */
+export interface SessionSelectPromptProfileRequest {
+  readonly sessionId: SessionId
+  readonly selection: PromptProfileSelection
+}
+
+/** Accepted Prompt Profile selection for the next model request. */
+export interface SessionSelectPromptProfileValue {
+  readonly selected: PromptProfileSelection
+  readonly changed: boolean
+}
+
+/** Prompt Profile catalog and deterministic Auto-resolution rules. */
+export interface PromptProfileCatalogValue {
+  readonly profiles: readonly PromptProfileDefinition[]
+  readonly defaultRules: readonly PromptProfileDefaultRule[]
+}
+
+/** Create one custom Prompt Profile. */
+export interface PromptProfileCreateRequest {
+  readonly profile: PromptProfileDraft
+}
+
+/** Update one custom Prompt Profile by appending an immutable revision. */
+export interface PromptProfileUpdateRequest {
+  readonly profileId: PromptProfileId
+  readonly profile: PromptProfileDraft
+}
+
+/** Hide one custom Prompt Profile without deleting historical revisions. */
+export interface PromptProfileRemoveRequest {
+  readonly profileId: PromptProfileId
+}
+
+/** Result of custom Prompt Profile creation or update. */
+export interface PromptProfileWriteValue {
+  readonly profile: PromptProfileDefinition
+}
+
+/** Result of hiding one custom Prompt Profile. */
+export interface PromptProfileRemoveValue {
+  readonly removed: true
 }
 
 /** Session rename request. */

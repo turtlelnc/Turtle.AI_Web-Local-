@@ -102,6 +102,9 @@
       name: '@deepseek-ai/dsh-host-plugin-inventory'
 
     # Session commands, cold reads, and live control over Typert Remote.
+    - id: authorization-controller
+      name: '@deepseek-ai/dsh-api-authorization-controller'
+
     - id: session-controller
       name: '@deepseek-ai/dsh-api-session-controller'
 

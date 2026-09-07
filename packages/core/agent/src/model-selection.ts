@@ -76,6 +76,8 @@ function modelSwitchNotice(previous: ModelSelection, selected: ModelSelection) {
 export function installModelSelection(agentCtx: Context, selection: ModelSelectionRef): () => void {
   const disposeAssembly = agentCtx.on('system-prompt/assemble', async (_assembly, _context, next) => {
     const selected = selection.current
+    if (selected === undefined) delete _context.modelSelection
+    else _context.modelSelection = selected
     const assembled = await next()
     selection.assembled = selected
     if (selected === undefined) return assembled

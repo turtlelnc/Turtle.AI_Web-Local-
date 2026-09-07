@@ -1,6 +1,7 @@
 /** Session Remote owner: cold reads, explicit Agent commands, and live control state. */
 
 import { Context } from '@deepseek-ai/cordis'
+import type {} from '@deepseek-ai/dsh-prompt-profiles'
 import z from '@deepseek-ai/schemastery'
 import { errorChain } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-client-file-upload'
@@ -24,6 +25,12 @@ import { installModelSelectionProjection } from './model-selection-projection.ts
 import { SessionSkillCatalog } from './skill-catalog.ts'
 import type {
   ModelCatalog,
+  PromptProfileCatalogValue,
+  PromptProfileCreateRequest,
+  PromptProfileRemoveRequest,
+  PromptProfileRemoveValue,
+  PromptProfileUpdateRequest,
+  PromptProfileWriteValue,
   SessionAttachmentRequest,
   SessionAttachmentValue,
   SessionCancelRequest,
@@ -49,6 +56,8 @@ import type {
   SessionSearchValue,
   SessionSelectModelRequest,
   SessionSelectModelValue,
+  SessionSelectPromptProfileRequest,
+  SessionSelectPromptProfileValue,
   SessionUpdateQueueRequest,
   SessionUpdateQueueValue,
 } from './types.ts'
@@ -87,6 +96,7 @@ export class SessionController extends TypertRemoteService {
     'attachments',
     'fileUploads',
     'llm',
+    'promptProfiles',
     'sessions',
     'sessionProjections',
     'sessionQuery',
@@ -246,6 +256,54 @@ export class SessionController extends TypertRemoteService {
   @Remote('selectModel')
   selectModel(request: SessionSelectModelRequest): Promise<SessionSelectModelValue> {
     return this.commands.selectModel(request)
+  }
+
+  /** Select Auto or one exact Prompt Profile revision for the Session's next request. */
+  @Remote('selectPromptProfile')
+  selectPromptProfile(
+    request: SessionSelectPromptProfileRequest,
+  ): Promise<SessionSelectPromptProfileValue> {
+    return this.commands.selectPromptProfile(request)
+  }
+
+  /** List visible Prompt Profiles and the ordered Auto provider rules. */
+  @Remote('promptProfileCatalog')
+  promptProfileCatalog(): PromptProfileCatalogValue {
+    return {
+      profiles: this.ctx.promptProfiles.list(),
+      defaultRules: this.ctx.promptProfiles.defaultRules(),
+    }
+  }
+
+  /** Create one custom Prompt Profile at its first immutable revision. */
+  @Remote('createPromptProfile')
+  async createPromptProfile(request: PromptProfileCreateRequest): Promise<PromptProfileWriteValue> {
+    try {
+      return { profile: await this.ctx.promptProfiles.create(request.profile) }
+    } catch (error) {
+      throw new RemoteError('gateway/bad-request', error instanceof Error ? error.message : String(error), {})
+    }
+  }
+
+  /** Append one immutable revision to an existing custom Prompt Profile. */
+  @Remote('updatePromptProfile')
+  async updatePromptProfile(request: PromptProfileUpdateRequest): Promise<PromptProfileWriteValue> {
+    try {
+      return { profile: await this.ctx.promptProfiles.update(request.profileId, request.profile) }
+    } catch (error) {
+      throw new RemoteError('gateway/bad-request', error instanceof Error ? error.message : String(error), {})
+    }
+  }
+
+  /** Hide one custom Prompt Profile while retaining revisions used by sessions. */
+  @Remote('removePromptProfile')
+  async removePromptProfile(request: PromptProfileRemoveRequest): Promise<PromptProfileRemoveValue> {
+    try {
+      await this.ctx.promptProfiles.remove(request.profileId)
+      return { removed: true }
+    } catch (error) {
+      throw new RemoteError('gateway/bad-request', error instanceof Error ? error.message : String(error), {})
+    }
   }
 
   /**

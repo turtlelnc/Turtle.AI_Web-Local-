@@ -97,6 +97,11 @@
     - id: credentials
       name: '@deepseek-ai/dsh-credentials-local'
 
+    # Interactive OAuth/device-code lifecycle shared by Host authorization
+    # backends. Credential values stay behind ctx.credentials.
+    - id: authorization
+      name: '@deepseek-ai/dsh-authorization'
+
     # The pi-ai multi-provider twin, mounted dormant: zero routes (and no extra
     # models in the picker) until a `llm-pi-ai:` settings section supplies provider
     # profiles — then those routes register live, keys resolving per request
@@ -106,6 +111,10 @@
     # document.
     - id: llm-pi-ai
       name: '@deepseek-ai/dsh-llm-pi-ai'
+      config:
+        providers:
+          openai-codex:
+            displayName: ChatGPT / Codex
 
     - id: session-persistence-jsonl
       name: '@deepseek-ai/dsh-session-persistence-jsonl'
@@ -466,6 +475,11 @@
       name: '@deepseek-ai/dsh-system-prompt'
       config:
         personaPrefix: ''
+
+    # Provider-independent behavior selection. Auto resolves from the exact
+    # provider captured by model selection for the same prompt assembly.
+    - id: prompt-profiles
+      name: '@deepseek-ai/dsh-prompt-profiles'
 
     # Agents created at startup. The base stays empty; raw overlays may create
     # agents, while Web creates sessions on client request.

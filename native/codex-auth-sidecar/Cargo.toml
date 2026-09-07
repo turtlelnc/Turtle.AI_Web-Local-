@@ -1,0 +1,19 @@
+[package]
+name = "codex-auth-sidecar"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+
+[dependencies]
+base64 = "0.22"
+codex-http-client = { git = "https://github.com/openai/codex.git", rev = "f326857cf405fb254cf6c8f38766daff074fca6e" }
+codex-login = { git = "https://github.com/openai/codex.git", rev = "f326857cf405fb254cf6c8f38766daff074fca6e" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["io-std", "io-util", "macros", "rt-multi-thread"] }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"

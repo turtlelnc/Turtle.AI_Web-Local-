@@ -59,6 +59,7 @@
     "@deepseek-ai/dsh-scope": "workspace:^"
   },
   "devDependencies": {
+    "@deepseek-ai/dsh-api-authorization-controller": "workspace:^",
     "@deepseek-ai/cordis": "workspace:^",
     "@deepseek-ai/dsh-agent-presets": "workspace:^",
     "@deepseek-ai/dsh-api-gateway": "workspace:^",

@@ -11,6 +11,99 @@
   color: var(--dsw-alias-label-primary);
 }
 
+.authCard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 16px;
+  border: 0.5px solid var(--dsw-alias-border-l4);
+  border-radius: 14px;
+  background: var(--dsw-alias-bg-module-platform);
+}
+
+.authBackend {
+  display: block;
+  margin-top: 2px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.authStatus {
+  margin-left: auto;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+}
+
+.authStatus[data-configured='true'] {
+  color: var(--dsw-alias-state-success-primary);
+}
+
+.authNotice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-secondary);
+  font-size: 13px;
+}
+
+.authNotice a {
+  color: var(--dsw-alias-link);
+}
+
+.authNotice code {
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+.authPrompt {
+  display: grid;
+  gap: 8px;
+}
+
+.authPrompt form {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.authPrompt form .input {
+  flex: 1;
+}
+
+.profileMapping {
+  margin: 0;
+  padding: 10px 12px;
+  border-left: 2px solid var(--dsw-alias-border-l3);
+  color: var(--dsw-alias-label-secondary);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.profileInstructions {
+  margin: 0;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 13px;
+  line-height: 20px;
+  white-space: pre-wrap;
+}
+
+.profileTextarea {
+  box-sizing: border-box;
+  min-height: 112px;
+  padding-block: 8px;
+  resize: vertical;
+}
+
 .title {
   margin: 0;
   font-size: 16px;

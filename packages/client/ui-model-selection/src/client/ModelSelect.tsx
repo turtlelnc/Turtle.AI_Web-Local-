@@ -16,7 +16,9 @@ import {
   type KeyboardEvent, type FocusEvent,
 } from 'react'
 import clsx from 'clsx'
-import type { ModelReasoningEffort, ModelSelection } from '@deepseek-ai/dsh-api-remotes/client'
+import type {
+  ModelReasoningEffort, ModelSelection, PromptProfileDefinition, PromptProfileSelection,
+} from '@deepseek-ai/dsh-api-remotes/client'
 import {
   IconCheckOutline16, IconChevronDownOutline14, IconChevronRightOutline14,
   IconWarningOutline16, Toast,
@@ -26,7 +28,7 @@ import type { ModelSelectInjected } from './slots.ts'
 import css from './ModelSelect.module.css'
 
 /** Which pane the dropdown shows: the two-row root or one drilled-in list. */
-type Pane = 'root' | 'model' | 'effort'
+type Pane = 'root' | 'model' | 'effort' | 'profile'
 
 /** One dynamic effort row; undefined means preserve the provider default. */
 interface EffortChoice {
@@ -42,7 +44,7 @@ interface EffortChoice {
  * @returns the trigger and, while open, the two-level menu.
  */
 export function ModelSelect(
-  { locked, available, directory, load, select, t }:
+  { locked, available, directory, load, select, selectProfile, t }:
   ModelSelectInjected & { locked: boolean } & PropsLocale<'model'>,
 ) {
   const state = useSyncExternalStore(
@@ -99,6 +101,9 @@ export function ModelSelect(
       })),
     ], [reasoning, t])
   const busy = state.status === 'selecting'
+  const profileLabel = state.promptProfileSelection.mode === 'auto'
+    ? t('profile.auto', { profile: state.effectivePromptProfile?.name ?? t('profile.fallback') })
+    : state.effectivePromptProfile?.name ?? state.promptProfileSelection.profileId
 
   const reload = (): void => {
     lastActionRef.current = 'load'
@@ -192,6 +197,14 @@ export function ModelSelect(
     void select(selection).then(settleSelection)
   }
 
+  const chooseProfile = (profile: PromptProfileDefinition | null): void => {
+    const selection: PromptProfileSelection = profile === null
+      ? { mode: 'auto' }
+      : { mode: 'manual', profileId: profile.id, revision: profile.revision }
+    lastActionRef.current = 'select'
+    void selectProfile(selection).then(settleSelection)
+  }
+
   const waiting = state.current === null && state.status === 'loading'
   const modelLabel = waiting
     ? t('trigger.loading')
@@ -252,6 +265,11 @@ export function ModelSelect(
                 <span className={css.cellValue}>{modelLabel}</span>
                 <IconChevronRightOutline14 className={css.cellChevron} />
               </button>
+              <button ref={itemRef()} type="button" role="menuitem" className={css.cell} onClick={() => { setPane('profile') }}>
+                <span className={css.cellLabel}>{t('menu.profile')}</span>
+                <span className={css.cellValue}>{profileLabel}</span>
+                <IconChevronRightOutline14 className={css.cellChevron} />
+              </button>
               {reasoning !== undefined && (
                 <button ref={itemRef()} type="button" role="menuitem" className={css.cell} onClick={() => { setPane('effort') }}>
                   <span className={css.cellLabel}>{t('menu.effort')}</span>
@@ -260,6 +278,46 @@ export function ModelSelect(
                 </button>
               )}
             </>
+          )}
+          {pane === 'profile' && (
+            <div className={css.groups} role="group" aria-label={t('menu.profile')}>
+              <button
+                ref={itemRef()}
+                type="button"
+                role="menuitemradio"
+                aria-checked={state.promptProfileSelection.mode === 'auto'}
+                className={clsx(css.option, state.promptProfileSelection.mode === 'auto' && css.selected)}
+                onClick={() => { chooseProfile(null) }}
+              >
+                <span className={css.optionCopy}>
+                  <span className={css.modelName}>{t('profile.auto', {
+                    profile: state.effectivePromptProfile?.name ?? t('profile.fallback'),
+                  })}</span>
+                </span>
+                {state.promptProfileSelection.mode === 'auto' && <IconCheckOutline16 className={css.check} />}
+              </button>
+              {state.promptProfiles.map((profile) => {
+                const selected = state.promptProfileSelection.mode === 'manual'
+                  && state.promptProfileSelection.profileId === profile.id
+                  && state.promptProfileSelection.revision === profile.revision
+                return (
+                  <button
+                    key={`${profile.id}:${profile.revision}`}
+                    ref={itemRef()}
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={selected}
+                    className={clsx(css.option, selected && css.selected)}
+                    onClick={() => { chooseProfile(profile) }}
+                  >
+                    <span className={css.optionCopy}>
+                      <span className={css.modelName}>{profile.name}</span>
+                    </span>
+                    {selected && <IconCheckOutline16 className={css.check} />}
+                  </button>
+                )
+              })}
+            </div>
           )}
 
           {pane === 'model' && (

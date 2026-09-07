@@ -1,0 +1,12 @@
+This product includes source designed to link against portions of OpenAI Codex.
+
+OpenAI Codex
+Copyright OpenAI
+Licensed under the Apache License, Version 2.0.
+
+The pinned upstream revision is:
+f326857cf405fb254cf6c8f38766daff074fca6e
+
+Only the separately built codex-auth-sidecar links to the upstream
+`codex-login` and `codex-http-client` crates. The DeepSeek Harness agent loop,
+tools, approvals, sessions, and UI remain the product runtime.

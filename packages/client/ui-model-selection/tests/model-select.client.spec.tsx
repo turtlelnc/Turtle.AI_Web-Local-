@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { ModelSelection } from '@deepseek-ai/dsh-api-remotes/client'
+import type { ModelSelection, PromptProfileDefinition } from '@deepseek-ai/dsh-api-remotes/client'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { ComponentProps } from 'react'
 import type { ModelDirectoryState } from '../src/client/directory.ts'
@@ -46,6 +46,9 @@ function state(overrides: Partial<ModelDirectoryState> = {}): ModelDirectoryStat
     failures: [],
     status: 'ready',
     error: null,
+    promptProfiles: [],
+    promptProfileSelection: { mode: 'auto' },
+    effectivePromptProfile: null,
     ...overrides,
   }
 }
@@ -53,6 +56,42 @@ function state(overrides: Partial<ModelDirectoryState> = {}): ModelDirectoryStat
 afterEach(cleanup)
 
 describe('ModelSelect reasoning effort', () => {
+  it('shows the effective Auto profile and permits a manual provider-independent override', async () => {
+    const codex = {
+      id: 'codex',
+      name: 'Codex',
+      base: 'codex',
+      additionalInstructions: '',
+      behavior: { progressUpdates: 'inherit', responseDetail: 'inherit' },
+      revision: 'builtin-1',
+      builtIn: true,
+    } as PromptProfileDefinition
+    const directory = createSnapshotStore<ModelDirectoryState>(state({
+      promptProfiles: [codex],
+      effectivePromptProfile: codex,
+    }))
+    const selectProfile = vi.fn().mockResolvedValue(true)
+    render(<ModelSelect
+      locked={false}
+      available
+      directory={directory}
+      load={vi.fn()}
+      select={vi.fn().mockResolvedValue(true)}
+      selectProfile={selectProfile}
+      t={t}
+    />)
+
+    fireEvent.click(screen.getByRole('button', { name: /选择模型，当前/ }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /提示词配置.*自动 · Codex/ }))
+    expect(screen.getByRole('menuitemradio', { name: '自动 · Codex' }).getAttribute('aria-checked')).toBe('true')
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Codex' }))
+    await waitFor(() => {
+      expect(selectProfile).toHaveBeenCalledWith({
+        mode: 'manual', profileId: codex.id, revision: codex.revision,
+      })
+    })
+  })
+
   it('renders effort names without descriptions and submits the effort as part of the session selection', async () => {
     const directory = createSnapshotStore<ModelDirectoryState>(state())
     const select = vi.fn(async (selection: ModelSelection) => {

@@ -2,6 +2,7 @@
 
 import { randomUUID } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
+import type {} from '@deepseek-ai/dsh-prompt-profiles'
 import { brandString } from '@deepseek-ai/dsh-brand'
 import type { Agent, ModelSelection as AgentModelSelection } from '@deepseek-ai/dsh-agent'
 import { AttachmentError } from '@deepseek-ai/dsh-attachment'
@@ -47,6 +48,8 @@ import type {
   SessionRenameValue,
   SessionSelectModelRequest,
   SessionSelectModelValue,
+  SessionSelectPromptProfileRequest,
+  SessionSelectPromptProfileValue,
   SessionUpdateQueueRequest,
   SessionUpdateQueueValue,
   SessionRequestId,
@@ -158,6 +161,23 @@ export class SessionCommandController {
         )
       }
     })
+  }
+
+  /** Validate and install one Session-local Prompt Profile selection. */
+  async selectPromptProfile(
+    request: SessionSelectPromptProfileRequest,
+  ): Promise<SessionSelectPromptProfileValue> {
+    const agent = await this.resolveAgent(request.sessionId)
+    try {
+      const changed = this.ctx.promptProfiles.select(agent.session, request.selection)
+      return { selected: request.selection, changed }
+    } catch (error) {
+      throw new RemoteError(
+        'gateway/bad-request',
+        error instanceof Error ? error.message : String(error),
+        {},
+      )
+    }
   }
 
   /**

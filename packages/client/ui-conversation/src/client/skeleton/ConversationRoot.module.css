@@ -27,7 +27,7 @@
      by the width handles) replaces the adaptive term wholesale. */
   --dsh-chat-content-width: var(
     --dsh-chat-user-width,
-    clamp(680px, calc(var(--dsh-conversation-column-width, 0px) * 0.64), 920px)
+    clamp(620px, calc(var(--dsh-conversation-column-width, 0px) * 0.61), 840px)
   );
   --dsh-composer-card-max-width: calc(var(--dsh-chat-content-width) + 32px);
   --dsh-composer-side-clearance: 16px;

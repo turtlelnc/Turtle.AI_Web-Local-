@@ -235,7 +235,15 @@ export interface EpochHeader {
   system?: string
   /** Assembled tool schemas; absent for a tool-less request. */
   tools?: ToolSchema[]
+  /** Plugin-owned metadata that identifies model-visible request policy. */
+  metadata?: RequestHeaderMetadata
 }
+
+/** Merge-extensible metadata persisted with a request header. */
+export interface RequestHeaderMetadataMap {}
+
+/** Metadata fields registered by request-assembly plugins. */
+export type RequestHeaderMetadata = Partial<RequestHeaderMetadataMap>
 
 /** Registration-bound metadata for one resolved model route. */
 export interface RequestContext {

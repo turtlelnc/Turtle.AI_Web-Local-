@@ -127,6 +127,7 @@
     "scripts/client-bundle-purity.spec.ts"
   ],
   "references": [
+    { "path": "./packages/api/authorization-controller" },
     { "path": "./vendor/cosmokit" },
     { "path": "./vendor/schemastery" },
     { "path": "./vendor/cordis" },
@@ -204,6 +205,7 @@
     { "path": "./packages/core/system-prompt" },
     { "path": "./packages/core/agent" },
     { "path": "./packages/core/agent-default-model" },
+    { "path": "./packages/core/prompt-profiles" },
     { "path": "./packages/interaction/commands" },
     { "path": "./packages/goal/goal" },
     { "path": "./packages/goal/tool-goal" },

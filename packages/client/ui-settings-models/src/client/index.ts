@@ -16,6 +16,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 // (settings/credentials invalidations ride the allowlist) into this program.
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import { ModelsSection } from './ModelsSection.tsx'
+import { PromptProfilesSection } from './PromptProfilesSection.tsx'
 import type { ModelsSectionInjected } from './ModelsSection.tsx'
 import { DeepSeekOnboardingDialog } from './DeepSeekOnboardingDialog.tsx'
 import type { DeepSeekOnboardingInjected } from './DeepSeekOnboardingDialog.tsx'
@@ -83,13 +84,19 @@ export function apply(ctx: ClientContext): void {
   // Registration-time text (the nav label thunk) and the inject faces share
   // one bound translate; copy freshness rides the locale revision.
   const t = ctx.locale.bind(NS) as ModelsSectionInjected['t']
-  const injected = (): ModelsSectionInjected => ({
-    controller,
-    hooks: { snapshot: controller.store },
-    operations,
-    schema,
-    t,
-  })
+  const injected = (): ModelsSectionInjected => {
+    const authorization = (ctx.remote as {
+      authorization?: ModelsSectionInjected['authorization']
+    }).authorization
+    return {
+      controller,
+      hooks: { snapshot: controller.store },
+      operations,
+      schema,
+      t,
+      ...(authorization === undefined ? {} : { authorization }),
+    }
+  }
   const deepSeekOnboardingInjected = (): DeepSeekOnboardingInjected => ({
     controller,
     hooks: { models: controller.store },
@@ -139,6 +146,13 @@ export function apply(ctx: ClientContext): void {
       'settings.models.footer': { kind: 'list', scope: 'root' },
     },
   }, ModelsSection))
+  ctx.slots.inject('settings.section', () => ctx.slots.register({
+    name: 'settings.section',
+    id: 'prompt-profiles',
+    order: 20,
+    label: () => t('profiles.nav'),
+    inject: () => ({ remote: ctx.remote.session, t }),
+  }, PromptProfilesSection))
   ctx.slots.inject('settings.onboarding', () => ctx.slots.register({
     name: 'settings.onboarding',
     id: 'welcome-notice',

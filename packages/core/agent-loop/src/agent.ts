@@ -358,6 +358,7 @@ export class ReactLoopAgent implements Agent {
         startsRequestSeries,
         surfaceGeneration,
         signal,
+        assembly.metadata,
       )
       startsRequestSeries = false
       const live = new AssistantStreamAttempt(
@@ -494,6 +495,7 @@ export class ReactLoopAgent implements Agent {
     startsRequestSeries: boolean,
     surfaceGeneration: number,
     signal: AbortSignal,
+    metadata: PromptAssembly['metadata'],
   ): Promise<{ request: GenerateOptions; preparedCall?: PreparedLlmCall }> {
     const { session } = this
 
@@ -544,6 +546,7 @@ export class ReactLoopAgent implements Agent {
       ...preparedCall === undefined ? {} : { adapterDefaults: preparedCall.adapterDefaults },
       ...system ? { system } : {},
       ...tools.length > 0 ? { tools } : {},
+      ...metadata === undefined ? {} : { metadata },
     })
     const baseline = this.session.requestHeader()
     const startsSeries = startsRequestSeries

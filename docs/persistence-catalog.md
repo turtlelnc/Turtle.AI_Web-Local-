@@ -88,7 +88,7 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
 }[T]
 ```
 
-Sources: [`packages/core/session/src/types.ts:385`](../packages/core/session/src/types.ts) · [`packages/core/session/src/types.ts:393`](../packages/core/session/src/types.ts) · [`packages/core/session/src/types.ts:422`](../packages/core/session/src/types.ts) · [`packages/core/session/src/types.ts:453`](../packages/core/session/src/types.ts)
+Sources: [`packages/core/session/src/types.ts:393`](../packages/core/session/src/types.ts) · [`packages/core/session/src/types.ts:401`](../packages/core/session/src/types.ts) · [`packages/core/session/src/types.ts:430`](../packages/core/session/src/types.ts) · [`packages/core/session/src/types.ts:461`](../packages/core/session/src/types.ts)
 
 ## Events
 
@@ -215,7 +215,7 @@ Source: [`packages/interaction/user-approval/src/index.ts:33`](../packages/inter
 'assistant/attempt': { turn: number; step: number; stream: AssistantStreamRecord[] }
 ```
 
-Source: [`packages/core/session/src/types.ts:319`](../packages/core/session/src/types.ts)
+Source: [`packages/core/session/src/types.ts:327`](../packages/core/session/src/types.ts)
 
 <a id="assistantmessage--surface"></a>
 
@@ -245,7 +245,7 @@ Source: [`packages/core/session/src/types.ts:319`](../packages/core/session/src/
 
 Types: [TokenUsage](subsystems/llm-streaming.md)
 
-Source: [`packages/core/session/src/types.ts:305`](../packages/core/session/src/types.ts)
+Source: [`packages/core/session/src/types.ts:313`](../packages/core/session/src/types.ts)
 
 ### `command/*`
 
@@ -542,7 +542,7 @@ Source: [`packages/llm/llm-retry/src/types.ts:11`](../packages/llm/llm-retry/src
 'model/selection': ModelSelection
 ```
 
-Source: [`packages/api/session-controller/src/types.ts:40`](../packages/api/session-controller/src/types.ts)
+Source: [`packages/api/session-controller/src/types.ts:56`](../packages/api/session-controller/src/types.ts)
 
 ### `permission/*`
 
@@ -579,6 +579,22 @@ Source: [`packages/interaction/permission-presets/src/index.ts:53`](../packages/
 
 Source: [`packages/plan/plan-mode/src/index.ts:46`](../packages/plan/plan-mode/src/index.ts)
 
+### `prompt-profile/*`
+
+<a id="prompt-profileselection--log-only"></a>
+
+#### `prompt-profile/selection` — log-only
+
+```ts persistence-catalog
+/**
+ * Selects Auto or one immutable Prompt Profile revision for a later request.
+ * @param mode - Auto or manual resolution policy.
+ */
+'prompt-profile/selection': PromptProfileSelection
+```
+
+Source: [`packages/core/prompt-profiles/src/types.ts:92`](../packages/core/prompt-profiles/src/types.ts)
+
 ### `request/*`
 
 <a id="requestcontext--log-only"></a>
@@ -593,7 +609,7 @@ Source: [`packages/plan/plan-mode/src/index.ts:46`](../packages/plan/plan-mode/s
 'request/context': RequestContext
 ```
 
-Source: [`packages/core/session/src/types.ts:358`](../packages/core/session/src/types.ts)
+Source: [`packages/core/session/src/types.ts:366`](../packages/core/session/src/types.ts)
 
 <a id="requestheader--log-only"></a>
 
@@ -612,7 +628,7 @@ Source: [`packages/core/session/src/types.ts:358`](../packages/core/session/src/
 }
 ```
 
-Source: [`packages/core/session/src/types.ts:348`](../packages/core/session/src/types.ts)
+Source: [`packages/core/session/src/types.ts:356`](../packages/core/session/src/types.ts)
 
 ### `sandbox/*`
 
@@ -687,7 +703,7 @@ Source: [`packages/schedule/schedule/src/types.ts:219`](../packages/schedule/sch
 'session/end-seed': { inherited?: true }
 ```
 
-Source: [`packages/core/session/src/types.ts:381`](../packages/core/session/src/types.ts)
+Source: [`packages/core/session/src/types.ts:389`](../packages/core/session/src/types.ts)
 
 <a id="sessiontitle--log-only"></a>
 
@@ -749,7 +765,7 @@ Source: [`packages/session/session-log-deepseek/src/types.ts:59`](../packages/se
 'step/end': { turn: number; step: number }
 ```
 
-Source: [`packages/core/session/src/types.ts:286`](../packages/core/session/src/types.ts)
+Source: [`packages/core/session/src/types.ts:294`](../packages/core/session/src/types.ts)
 
 <a id="stepstart--log-only"></a>
 
@@ -760,7 +776,7 @@ Source: [`packages/core/session/src/types.ts:286`](../packages/core/session/src/
 'step/start': { turn: number; step: number }
 ```
 
-Source: [`packages/core/session/src/types.ts:284`](../packages/core/session/src/types.ts)
+Source: [`packages/core/session/src/types.ts:292`](../packages/core/session/src/types.ts)
 
 ### `subagent/*`
 
@@ -891,7 +907,7 @@ Source: [`packages/todo/tool-todo/src/types.ts:31`](../packages/todo/tool-todo/s
 
 Types: [ToolCallId](subsystems/core.md)
 
-Source: [`packages/core/session/src/types.ts:325`](../packages/core/session/src/types.ts)
+Source: [`packages/core/session/src/types.ts:333`](../packages/core/session/src/types.ts)
 
 <a id="toolcode-dispatch--log-only"></a>
 
@@ -966,7 +982,7 @@ Source: [`packages/core/tools/src/types.ts:40`](../packages/core/tools/src/types
 }
 ```
 
-Source: [`packages/core/session/src/types.ts:337`](../packages/core/session/src/types.ts)
+Source: [`packages/core/session/src/types.ts:345`](../packages/core/session/src/types.ts)
 
 ### `tool-workflow/*`
 
@@ -1046,7 +1062,7 @@ Source: [`packages/workflow/tool-workflow/src/types.ts:47`](../packages/workflow
 
 Types: [TurnEndReason](subsystems/session.md)
 
-Source: [`packages/core/session/src/types.ts:282`](../packages/core/session/src/types.ts)
+Source: [`packages/core/session/src/types.ts:290`](../packages/core/session/src/types.ts)
 
 <a id="turnstart--log-only"></a>
 
@@ -1062,7 +1078,7 @@ Source: [`packages/core/session/src/types.ts:282`](../packages/core/session/src/
 'turn/start': { turn: number }
 ```
 
-Source: [`packages/core/session/src/types.ts:273`](../packages/core/session/src/types.ts)
+Source: [`packages/core/session/src/types.ts:281`](../packages/core/session/src/types.ts)
 
 ### `user/*`
 
@@ -1081,7 +1097,7 @@ Source: [`packages/core/session/src/types.ts:273`](../packages/core/session/src/
 'user/message': UserMessage
 ```
 
-Source: [`packages/core/session/src/types.ts:294`](../packages/core/session/src/types.ts)
+Source: [`packages/core/session/src/types.ts:302`](../packages/core/session/src/types.ts)
 
 ### `web/*`
 

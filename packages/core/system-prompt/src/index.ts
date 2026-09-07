@@ -116,7 +116,15 @@ export interface PromptAssembly {
   contexts: AssembledContext[]
   tools: ToolSchema[]
   variables: Record<string, string | undefined>
+  /** Plugin-owned request metadata copied into the durable request header. */
+  metadata?: PromptAssemblyMetadata
 }
+
+/** Merge-extensible metadata contributed while assembling one model request. */
+export interface PromptAssemblyMetadataMap {}
+
+/** Metadata fields registered by prompt-assembly plugins. */
+export type PromptAssemblyMetadata = Partial<PromptAssemblyMetadataMap>
 
 const SECTION_ORDERS = {
   HARNESS_IDENTITY: -1000,
