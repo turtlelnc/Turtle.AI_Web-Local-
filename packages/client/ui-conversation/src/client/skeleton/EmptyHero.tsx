@@ -131,6 +131,8 @@ function HeroFish({ hovering }: { hovering: boolean }) {
  */
 export function HeroShell({ t, renderSlot, children }: HeroShellProps) {
   const [hovering, setHovering] = useState(false)
+  const configuredIcon = process.env.DSH_CLIENT_ICON_URL?.trim()
+  const configuredWelcome = process.env.DSH_CLIENT_WELCOME_TEXT?.trim()
   return (
     <div className={css.root}>
       <div className={css.stack}>
@@ -146,11 +148,15 @@ export function HeroShell({ t, renderSlot, children }: HeroShellProps) {
             onMouseLeave={() => { setHovering(false) }}
           >
             {renderSlot('conversation.hero.brand.mark', { size: 34, className: css.fish }, {
-              fallback: <HeroFish hovering={hovering} />,
+              fallback: configuredIcon === undefined || configuredIcon === ''
+                ? <HeroFish hovering={hovering} />
+                : <img className={css.fish} src={configuredIcon} width={34} height={34} alt="" />,
             })}
           </span>
           <span className={css.headlineText}>
-            {t('hero.headline')}
+            {configuredWelcome === undefined || configuredWelcome === ''
+              ? t('hero.headline')
+              : configuredWelcome}
           </span>
           <span className={css.previewBadge}>{t('hero.preview')}</span>
         </div>

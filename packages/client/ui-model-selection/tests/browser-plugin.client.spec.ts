@@ -77,6 +77,14 @@ async function bench() {
         },
       })
     },
+    promptProfileCatalog: () => Promise.resolve({
+      ok: true as const,
+      value: { profiles: [], defaultRules: [] },
+    }),
+    selectPromptProfile: (payload: { selection: { mode: 'auto' } | { mode: 'manual'; profileId: string; revision: string } }) => Promise.resolve({
+      ok: true as const,
+      value: { selected: payload.selection },
+    }),
     selectModel: (payload: { sessionId: SessionId; provider: string; model: string; reasoningEffort?: string }) => {
       calls.select += 1
       selected = {

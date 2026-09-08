@@ -45,9 +45,17 @@ export function createElectronBuilderConfig(
   }
   const update = resolveDesktopAutoUpdateConfig(env, resolvedPlatform, resolvedArch)
   const buildPaths = desktopTargetBuildPaths(update.target)
+  const configuredProductName = env.DSH_DESKTOP_PRODUCT_NAME?.trim()
+  const productName = configuredProductName === undefined || configuredProductName === ''
+    ? 'DeepSeek Harness'
+    : configuredProductName
+  const configuredIcon = env.DSH_DESKTOP_ICON?.trim()
+  const platformIcon = configuredIcon === undefined || configuredIcon === ''
+    ? {}
+    : { icon: configuredIcon }
   return {
     appId,
-    productName: 'DeepSeek Harness',
+    productName,
     artifactName: 'deepseek-harness-${version}-${os}-${arch}.${ext}',
     directories: { output: buildPaths.artifacts },
     asar: true,
@@ -62,6 +70,7 @@ export function createElectronBuilderConfig(
       { from: buildPaths.seed, to: 'seed' },
     ],
     mac: {
+      ...platformIcon,
       category: 'public.app-category.developer-tools',
       identity: macOSSigning?.signingIdentity,
       forceCodeSigning: true,
@@ -86,6 +95,7 @@ export function createElectronBuilderConfig(
       )
     },
     win: {
+      ...platformIcon,
       forceCodeSigning: true,
       signtoolOptions: {
         sign: windowsSigner,
@@ -94,6 +104,7 @@ export function createElectronBuilderConfig(
       target: ['nsis'],
     },
     linux: {
+      ...platformIcon,
       category: 'Development',
       target: ['AppImage'],
     },

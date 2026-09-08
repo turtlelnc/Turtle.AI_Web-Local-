@@ -139,6 +139,14 @@ const homeAndGuide = pairedPages([
     order: 3,
   },
   {
+    source: 'docs/user/guide/branding.md',
+    route: 'guide/branding.md',
+    label: { root: '自定义产品品牌', en: 'Customize product branding' },
+    sidebar: { root: 'zh-guide', en: 'en-guide' },
+    section: { root: '入门', en: 'Guide' },
+    order: 4,
+  },
+  {
     source: 'docs/user/guide/python-sdk.md',
     route: 'guide/python-sdk.md',
     label: { root: 'Python', en: 'Python' },

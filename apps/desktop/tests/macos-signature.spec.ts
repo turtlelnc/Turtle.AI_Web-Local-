@@ -47,6 +47,7 @@ describe('desktop macOS release signature', () => {
     expect(portablePath(config.extraResources[1]?.from ?? '')).toContain('/.desktop-build/targets/mac-arm64/seed')
     expect(config).toMatchObject({
       appId: RELEASE_ENVIRONMENT.DSH_DESKTOP_APP_ID,
+      productName: 'DeepSeek Harness',
       mac: {
         identity: RELEASE_ENVIRONMENT.DSH_DESKTOP_MACOS_SIGNING_IDENTITY,
         forceCodeSigning: true,
@@ -62,6 +63,18 @@ describe('desktop macOS release signature', () => {
       }],
     })
     expect(typeof config.artifactBuildCompleted).toBe('function')
+  })
+
+  it('projects a configured product name and icon into desktop packaging', async () => {
+    const { createElectronBuilderConfig } = await import('../electron-builder.config.mjs')
+    const config = createElectronBuilderConfig({
+      ...RELEASE_ENVIRONMENT,
+      DSH_DESKTOP_PRODUCT_NAME: 'My Harness',
+      DSH_DESKTOP_ICON: '/release/brand.png',
+    }, 'darwin', 'arm64')
+
+    expect(config.productName).toBe('My Harness')
+    expect(config.mac.icon).toBe('/release/brand.png')
   })
 
   it('validates Windows signing without requiring macOS identifiers for a Windows target', async () => {

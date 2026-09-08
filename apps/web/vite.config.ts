@@ -9,20 +9,59 @@ const src = (rel: string): string => fileURLToPath(new URL(rel, import.meta.url)
 const STANDALONE_ERROR = 'apps/web is not a standalone application: bare Vite cannot inject window.__DSH_BOOT__. '
   + 'From a repository checkout, run `pnpm dsh web`; an installed package uses `dsh web`. '
   + 'For client-plugin HMR, run `pnpm dsh web` together with `pnpm run dev:web`.'
-const DEFAULT_CLIENT_TITLE = 'DSH Local Build'
+const DEFAULT_CLIENT_TITLE = 'DeepSeek Harness'
 
 /** Escape build-time text before placing it in the HTML title element. */
 function escapeHtmlText(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
+/** Escape a build-time URL before placing it in an HTML attribute. */
+function escapeHtmlAttribute(value: string): string {
+  return escapeHtmlText(value).replace(/"/g, '&quot;')
+}
+
 /** Project the public build title into the initial HTML document. */
 function clientDocumentTitle(): Plugin {
   const title = escapeHtmlText(process.env.DSH_CLIENT_TITLE ?? DEFAULT_CLIENT_TITLE)
+  const icon = process.env.DSH_CLIENT_ICON_URL?.trim()
   return {
     name: 'dsh-client-document-title',
     transformIndexHtml(html) {
-      return html.replace('<title>DSH Local Build</title>', `<title>${title}</title>`)
+      const titled = html.replace('<title>DeepSeek Harness</title>', `<title>${title}</title>`)
+      return icon === undefined || icon === ''
+        ? titled
+        : titled.replace(
+            '<link rel="icon" type="image/svg+xml" href="/favicon.svg" />',
+            `<link rel="icon" href="${escapeHtmlAttribute(icon)}" />`,
+          )
+    },
+  }
+}
+
+/** Project configured branding into the installable Web app manifest. */
+function clientWebManifest(): Plugin {
+  const configuredTitle = process.env.DSH_CLIENT_TITLE?.trim()
+  const configuredIcon = process.env.DSH_CLIENT_ICON_URL?.trim()
+  return {
+    name: 'dsh-client-web-manifest',
+    async closeBundle() {
+      if ((configuredTitle === undefined || configuredTitle === '')
+        && (configuredIcon === undefined || configuredIcon === '')) return
+      const path = src('./dist/manifest.webmanifest')
+      const manifest = JSON.parse(await readFile(path, 'utf8')) as {
+        name: string
+        short_name: string
+        icons: Array<Record<string, string>>
+      }
+      if (configuredTitle !== undefined && configuredTitle !== '') {
+        manifest.name = configuredTitle
+        manifest.short_name = configuredTitle
+      }
+      if (configuredIcon !== undefined && configuredIcon !== '') {
+        manifest.icons = [{ src: configuredIcon, sizes: 'any', purpose: 'any' }]
+      }
+      await writeFile(path, `${JSON.stringify(manifest, null, 2)}\n`)
     },
   }
 }
@@ -141,7 +180,7 @@ export default defineConfig({
   // Relative asset URLs: preview.html mounts the same output under any base
   // directory, and the served index resolves identically from the site root.
   base: './',
-  plugins: [rejectStandaloneServe(), clientDocumentTitle(), react(), emitPreviewPage()],
+  plugins: [rejectStandaloneServe(), clientDocumentTitle(), react(), emitPreviewPage(), clientWebManifest()],
   build: {
     // The worker bootstrap holds its page at top-level await; Vite's default
     // `modules` target (es2020-era) rejects that syntax.

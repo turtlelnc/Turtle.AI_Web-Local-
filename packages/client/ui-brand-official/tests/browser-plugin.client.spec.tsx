@@ -78,6 +78,21 @@ describe('official browser-brand plugin', () => {
     expect(subject.slots.entries(HERO_HOLE)).toHaveLength(0)
   })
 
+  it('renders explicit sidebar brand overrides without occupying the conversation slot', async () => {
+    vi.stubEnv('DSH_CLIENT_BUILD_PROFILE', 'official')
+    vi.stubEnv('DSH_CLIENT_ICON_URL', '/brand.svg')
+    vi.stubEnv('DSH_CLIENT_TITLE', 'My Harness')
+    const subject = await bench()
+    await subject.ctx.plugin({ inject: [...inject], apply }).await()
+    expect(subject.slots.entries(HERO_HOLE)).toHaveLength(0)
+
+    const name = render(<OfficialBrandName />)
+    expect(name.getByText('My Harness')).toBeTruthy()
+    name.unmount()
+    const mark = render(<OfficialBrandMark size={24} />)
+    expect(mark.getByRole('presentation', { hidden: true }).getAttribute('src')).toBe('/brand.svg')
+  })
+
   it('renders the official name independently from both requested mark sizes', () => {
     const name = render(<OfficialBrandName />)
     expect(name.container.querySelector('svg')?.getAttribute('viewBox')).toBe('26 0 156 24')

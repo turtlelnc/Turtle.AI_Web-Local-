@@ -74,6 +74,7 @@ function fireResize(el: Element): void {
 afterEach(() => {
   cleanup()
   vi.unstubAllGlobals()
+  vi.unstubAllEnvs()
   resizeObservers.length = 0
 })
 beforeEach(() => {
@@ -335,6 +336,18 @@ describe('Hero chrome', () => {
     expect(brandMarkOwner.size).toBe(34)
     expect(brandMarkOwner.className).toBeTypeOf('string')
     expect(renderSlot.mock.calls[0]?.[2]?.fallback).toBeTruthy()
+  })
+
+  it('renders configured welcome copy and mark without changing the hero slots', () => {
+    vi.stubEnv('DSH_CLIENT_WELCOME_TEXT', 'Build something wonderful')
+    vi.stubEnv('DSH_CLIENT_ICON_URL', '/custom-mark.png')
+    const renderSlot = vi.fn<HeroShellProps['renderSlot']>((_key, _owner, options) =>
+      options?.fallback ?? null)
+    const view = render(<HeroShell t={makeTranslate(en, commonEn)} renderSlot={renderSlot} />)
+
+    expect(view.getByText('Build something wonderful')).toBeTruthy()
+    expect(view.getByRole('presentation', { hidden: true }).getAttribute('src')).toBe('/custom-mark.png')
+    expect(renderSlot).toHaveBeenCalledOnce()
   })
 })
 

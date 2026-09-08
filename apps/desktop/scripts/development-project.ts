@@ -57,9 +57,17 @@ function removeOwnedPath(path: string): void {
   unlinkSync(path)
 }
 
-function linkDirectory(source: string, destination: string): void {
+function linkDirectory(source: string, destination: string): boolean {
+  let resolved: string
+  try {
+    resolved = realpathSync(source)
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false
+    throw error
+  }
   mkdirSync(dirname(destination), { recursive: true })
-  symlinkSync(realpathSync(source), destination, process.platform === 'win32' ? 'junction' : 'dir')
+  symlinkSync(resolved, destination, process.platform === 'win32' ? 'junction' : 'dir')
+  return true
 }
 
 function mirrorDependencyLinks(sourceRoot: string, destinationRoot: string): void {
@@ -112,9 +120,9 @@ export function prepareDevelopmentProject(options: DevelopmentProjectOptions): s
   mirrorDependencyLinks(options.dependencyDir, destinationModules)
   const dshLink = join(destinationModules, '@deepseek-ai', 'dsh')
   removeOwnedPath(dshLink)
-  linkDirectory(options.cliDir, dshLink)
+  if (!linkDirectory(options.cliDir, dshLink)) throw new Error('desktop development: apps/cli is missing')
   const hostLink = join(destinationModules, '@deepseek-ai', 'dsh-desktop-host')
   removeOwnedPath(hostLink)
-  linkDirectory(options.hostDir, hostLink)
+  if (!linkDirectory(options.hostDir, hostLink)) throw new Error('desktop development: apps/desktop-host is missing')
   return options.projectDir
 }

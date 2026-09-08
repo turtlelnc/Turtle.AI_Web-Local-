@@ -216,6 +216,28 @@ export class FakeApiClient {
             failures: [],
           },
         }),
+        promptProfileCatalog: () => Promise.resolve(ok({ profiles: [], defaultRules: [] })),
+        selectPromptProfile: payload => Promise.resolve(ok({
+          selected: payload.selection,
+          changed: true,
+        })),
+        createPromptProfile: payload => Promise.resolve(ok({
+          profile: {
+            ...payload.profile,
+            id: (payload.profile.id ?? 'fixture-profile') as never,
+            revision: 'fixture-1' as never,
+            builtIn: false,
+          },
+        })),
+        updatePromptProfile: payload => Promise.resolve(ok({
+          profile: {
+            ...payload.profile,
+            id: payload.profileId,
+            revision: 'fixture-2' as never,
+            builtIn: false,
+          },
+        })),
+        removePromptProfile: () => Promise.resolve(ok({ removed: true as const })),
         search: (payload, signal) => {
           this.lastSearchSignal = signal
           return this.record('session.search', payload, this.onSearch(payload))

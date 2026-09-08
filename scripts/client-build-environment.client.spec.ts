@@ -94,7 +94,7 @@ describe('client build environment', () => {
     }).toThrow(/DSH_CLIENT_UNDECLARED/)
   })
 
-  it('inherits public values by default and isolates an explicit official profile', () => {
+  it('inherits public values by default and limits an official profile to public brand overrides', () => {
     const parent = {
       PATH: '/bin',
       DSH_BUILD_CLIENT_PROFILE: 'official',
@@ -102,6 +102,8 @@ describe('client build environment', () => {
       DSH_CLIENT_COMMIT_HASH: COMMIT_HASH.slice(0, 7),
       DSH_CLIENT_GIT_DIRTY: 'true',
       DSH_CLIENT_TITLE: 'Local title',
+      DSH_CLIENT_ICON_URL: '/local-mark.svg',
+      DSH_CLIENT_WELCOME_TEXT: 'Local welcome',
       DSH_CLIENT_VERSION: '1.2.3',
       DSH_CLIENT_EXTRA: 'local-extra',
     }
@@ -112,8 +114,10 @@ describe('client build environment', () => {
     expect(resolveClientBuildEnvironment(parent)).toEqual({
       DSH_CLIENT_BUILD_PROFILE: 'official',
       DSH_CLIENT_COMMIT_HASH: COMMIT_HASH.slice(0, 7),
-      DSH_CLIENT_TITLE: 'DeepSeek Harness',
+      DSH_CLIENT_ICON_URL: '/local-mark.svg',
+      DSH_CLIENT_TITLE: 'Local title',
       DSH_CLIENT_VERSION: '1.2.3',
+      DSH_CLIENT_WELCOME_TEXT: 'Local welcome',
     })
     expect(() => {
       resolveClientBuildEnvironment({ DSH_BUILD_CLIENT_PROFILE: 'official' })
@@ -128,14 +132,18 @@ describe('client build environment', () => {
     expect(clientBuildProcessEnvironment(parent, {
       DSH_CLIENT_BUILD_PROFILE: 'official',
       DSH_CLIENT_COMMIT_HASH: COMMIT_HASH.slice(0, 7),
-      DSH_CLIENT_TITLE: 'DeepSeek Harness',
+      DSH_CLIENT_ICON_URL: '/local-mark.svg',
+      DSH_CLIENT_TITLE: 'Local title',
       DSH_CLIENT_VERSION: '1.2.3',
+      DSH_CLIENT_WELCOME_TEXT: 'Local welcome',
     })).toEqual({
       PATH: '/bin',
       DSH_CLIENT_BUILD_PROFILE: 'official',
       DSH_CLIENT_COMMIT_HASH: COMMIT_HASH.slice(0, 7),
-      DSH_CLIENT_TITLE: 'DeepSeek Harness',
+      DSH_CLIENT_ICON_URL: '/local-mark.svg',
+      DSH_CLIENT_TITLE: 'Local title',
       DSH_CLIENT_VERSION: '1.2.3',
+      DSH_CLIENT_WELCOME_TEXT: 'Local welcome',
     })
     expect(repositoryCommitHash('/unused', { DSH_CLIENT_COMMIT_HASH: COMMIT_HASH })).toBe(COMMIT_HASH.slice(0, 7))
   })
@@ -161,6 +169,19 @@ describe('client build environment', () => {
       DSH_CLIENT_COMMIT_HASH: commit,
       DSH_CLIENT_TITLE: 'DeepSeek Harness',
       DSH_CLIENT_VERSION: '1.2.3-rc.4',
+    })
+    expect(officialClientBuildEnvironment(fixtureRoot, {
+      DSH_CLIENT_COMMIT_HASH: commit,
+      DSH_CLIENT_ICON_URL: '/brand.svg',
+      DSH_CLIENT_TITLE: 'My Harness',
+      DSH_CLIENT_WELCOME_TEXT: 'Welcome home',
+    })).toEqual({
+      DSH_CLIENT_BUILD_PROFILE: 'official',
+      DSH_CLIENT_COMMIT_HASH: commit,
+      DSH_CLIENT_ICON_URL: '/brand.svg',
+      DSH_CLIENT_TITLE: 'My Harness',
+      DSH_CLIENT_VERSION: '1.2.3-rc.4',
+      DSH_CLIENT_WELCOME_TEXT: 'Welcome home',
     })
 
     write(join(fixtureRoot, '.gitignore'), 'ignored.txt\n')

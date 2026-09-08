@@ -141,6 +141,11 @@
   justify-content: center;
 }
 
+.configuredBrandMark {
+  display: block;
+  object-fit: contain;
+}
+
 .brandName {
   display: inline-flex;
   align-items: center;

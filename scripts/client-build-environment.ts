@@ -22,6 +22,20 @@ const OFFICIAL_CLIENT_BUILD_ENVIRONMENT = {
   DSH_CLIENT_TITLE: 'DeepSeek Harness',
 } as const
 
+/** Public brand fields that an official-profile build may deliberately override. */
+const CLIENT_BRAND_ENV_NAMES = [
+  'DSH_CLIENT_ICON_URL',
+  'DSH_CLIENT_TITLE',
+  'DSH_CLIENT_WELCOME_TEXT',
+] as const
+
+function clientBrandEnvironment(environment: NodeJS.ProcessEnv): ClientBuildEnvironment {
+  return Object.fromEntries(CLIENT_BRAND_ENV_NAMES.flatMap((name) => {
+    const value = environment[name]?.trim()
+    return value === undefined || value === '' ? [] : [[name, value]]
+  }))
+}
+
 /** Public variable carrying the source commit embedded in client artifacts. */
 const CLIENT_COMMIT_HASH_VARIABLE = 'DSH_CLIENT_COMMIT_HASH'
 
@@ -144,6 +158,7 @@ export function officialClientBuildEnvironment(
     DSH_CLIENT_COMMIT_HASH: repositoryCommitHash(root, environment),
     DSH_CLIENT_VERSION: repositoryVersion(root),
     ...OFFICIAL_CLIENT_BUILD_ENVIRONMENT,
+    ...clientBrandEnvironment(environment),
   }
 }
 
@@ -200,6 +215,7 @@ export function resolveClientBuildEnvironment(
       DSH_CLIENT_COMMIT_HASH: commitHash,
       DSH_CLIENT_VERSION: version,
       ...OFFICIAL_CLIENT_BUILD_ENVIRONMENT,
+      ...clientBrandEnvironment(environment),
     }
   }
   throw new Error(`unknown client build profile ${JSON.stringify(profile)}; expected "official"`)

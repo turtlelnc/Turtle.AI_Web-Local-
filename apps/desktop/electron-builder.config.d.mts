@@ -1,6 +1,7 @@
 /** Electron-builder fields asserted by the Desktop release tests. */
 export interface DesktopElectronBuilderConfig {
   readonly appId: string
+  readonly productName: string
   readonly directories: {
     readonly output: string
   }
@@ -9,6 +10,7 @@ export interface DesktopElectronBuilderConfig {
     { readonly from: string, readonly to: 'seed' },
   ]
   readonly mac: {
+    readonly icon?: string
     readonly identity: string | undefined
     readonly forceCodeSigning: boolean
     readonly notarize: boolean

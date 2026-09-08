@@ -362,6 +362,7 @@ body:not([data-ds-dark-theme]) {
   --dsw-specific-sidebar-fill: rgb(244, 242, 237);
   --dsw-specific-sidebar-nav-item-active: rgb(234, 235, 233);
   --dsw-specific-sidebar-nav-item-hover: rgb(239, 238, 234);
+  --dsw-specific-tip: var(--dsw-alias-bg-layer-2);
 }
 
 body[data-ds-dark-theme] {
@@ -385,4 +386,5 @@ body[data-ds-dark-theme] {
   --dsw-specific-sidebar-fill: rgb(25, 24, 22);
   --dsw-specific-sidebar-nav-item-active: rgb(48, 47, 43);
   --dsw-specific-sidebar-nav-item-hover: rgb(39, 38, 35);
+  --dsw-specific-tip: var(--dsw-alias-bg-layer-2);
 }

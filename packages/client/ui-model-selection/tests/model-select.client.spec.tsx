@@ -104,6 +104,7 @@ describe('ModelSelect reasoning effort', () => {
       directory={directory}
       load={vi.fn()}
       select={select}
+      selectProfile={vi.fn().mockResolvedValue(true)}
       t={t}
     />)
 
@@ -146,6 +147,7 @@ describe('ModelSelect reasoning effort', () => {
       directory={directory}
       load={vi.fn()}
       select={vi.fn().mockResolvedValue(true)}
+      selectProfile={vi.fn().mockResolvedValue(true)}
       t={t}
     />)
 
@@ -168,6 +170,7 @@ describe('ModelSelect reasoning effort', () => {
       directory={directory}
       load={vi.fn()}
       select={select}
+      selectProfile={vi.fn().mockResolvedValue(true)}
       t={t}
     />)
 
@@ -194,6 +197,7 @@ describe('ModelSelect reasoning effort', () => {
       directory={directory}
       load={vi.fn()}
       select={vi.fn().mockResolvedValue(true)}
+      selectProfile={vi.fn().mockResolvedValue(true)}
       t={t}
     />)
 
@@ -227,6 +231,7 @@ describe('ModelSelect reasoning effort', () => {
       directory={directory}
       load={vi.fn()}
       select={select}
+      selectProfile={vi.fn().mockResolvedValue(true)}
       t={t}
     />)
 
@@ -247,6 +252,7 @@ describe('ModelSelect reasoning effort', () => {
       directory={createSnapshotStore(state())}
       load={load}
       select={vi.fn().mockResolvedValue(false)}
+      selectProfile={vi.fn().mockResolvedValue(false)}
       t={t}
     />)
 

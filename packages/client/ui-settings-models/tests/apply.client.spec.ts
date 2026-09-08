@@ -26,6 +26,7 @@ async function bench(isLoopback = true, settings?: object, services: object = {}
   locale.setLocale('zh')
   ctx.provide('locale', locale)
   const remote = new TestRemote(ctx, {
+    authorization: {},
     credentials: {
       describe: vi.fn(() => Promise.resolve({ ok: true, value: {} })),
       set: vi.fn(),
@@ -41,6 +42,7 @@ async function bench(isLoopback = true, settings?: object, services: object = {}
     // Models join itself never fetches until a section actually loads. The real
     // ui-settings apply also provides the settingsSchema service.
     settings: settings ?? scriptedSettingsRemote().settings,
+    session: {},
   })
   // The fixed Host facts the settings provider reads its persistence from.
   remote.$host = { home: undefined, isLoopback }
@@ -68,7 +70,8 @@ describe('ui-settings-models apply', () => {
 
   it('declares the services it uses', () => {
     expect(inject).toEqual([
-      'slots', 'locale', 'remote', 'remote.credentials', 'remote.llm', 'remote.settings',
+      'slots', 'locale', 'remote', 'remote.authorization', 'remote.credentials', 'remote.llm',
+      'remote.session', 'remote.settings',
       'settingsScope', 'settingsSchema',
     ])
   })

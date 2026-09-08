@@ -44,6 +44,14 @@ function localBuildVersion(): string | undefined {
     + (process.env.DSH_CLIENT_GIT_DIRTY === 'true' ? '-dirty' : '')
 }
 
+/** Render the configured image or the built-in Harness mark. */
+function DefaultBrandMark({ size }: { readonly size: number }) {
+  const configured = process.env.DSH_CLIENT_ICON_URL?.trim()
+  return configured === undefined || configured === ''
+    ? <FishLogo size={size} />
+    : <img className={css.configuredBrandMark} src={configured} width={size} height={size} alt="" />
+}
+
 /**
  * Render the sidebar column shell.
  * @param props - composed slot props (runtime share + injected callbacks, contract/slots.ts).
@@ -122,6 +130,10 @@ export function SidebarRoot({
   }, [pointerInside])
 
   const buildVersion = localBuildVersion()
+  const configuredTitle = process.env.DSH_CLIENT_TITLE?.trim()
+  const productTitle = configuredTitle === undefined || configuredTitle === ''
+    ? t('brand.localBuild')
+    : configuredTitle
 
   return (
     <div
@@ -149,15 +161,15 @@ export function SidebarRoot({
           >
             <span className={css.brandIdentity} aria-hidden="true">
               <span className={css.brandMark}>
-                {renderSlot('sidebar.brand.mark', { size: 24 }, { fallback: <FishLogo size={24} /> })}
+                {renderSlot('sidebar.brand.mark', { size: 24 }, { fallback: <DefaultBrandMark size={24} /> })}
               </span>
               <span className={css.brandName}>
                 {renderSlot('sidebar.brand.name', {}, {
                   fallback: buildVersion === undefined
-                    ? <span className={css.fallbackBrandName}>{t('brand.localBuild')}</span>
+                    ? <span className={css.fallbackBrandName}>{productTitle}</span>
                     : (
                       <span className={css.localBuildBrand}>
-                        <span className={css.localBuildTitle}>{t('brand.localBuild')}</span>
+                        <span className={css.localBuildTitle}>{productTitle}</span>
                         <span className={css.buildVersion}>{buildVersion}</span>
                       </span>
                     ),
@@ -177,7 +189,7 @@ export function SidebarRoot({
           >
             {!wide && (
               <span className={css.railMark} aria-hidden="true">
-                {renderSlot('sidebar.brand.mark', { size: 24 }, { fallback: <FishLogo size={24} /> })}
+                {renderSlot('sidebar.brand.mark', { size: 24 }, { fallback: <DefaultBrandMark size={24} /> })}
               </span>
             )}
             {/* Rail icons render at 18 (figma rail spec); expanded keeps the glyph-native sizes. */}

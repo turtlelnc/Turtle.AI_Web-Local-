@@ -581,6 +581,22 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
 
 来源：[`packages/plan/plan-mode/src/index.ts:46`](../packages/plan/plan-mode/src/index.ts)
 
+### `prompt-profile/*`
+
+<a id="prompt-profileselection--log-only"></a>
+
+#### `prompt-profile/selection` — 仅日志
+
+```ts persistence-catalog
+/**
+ * Selects Auto or one immutable Prompt Profile revision for a later request.
+ * @param mode - Auto or manual resolution policy.
+ */
+'prompt-profile/selection': PromptProfileSelection
+```
+
+来源：[`packages/core/prompt-profiles/src/types.ts:92`](../packages/core/prompt-profiles/src/types.ts)
+
 ### `request/*`
 
 <a id="requestcontext--log-only"></a>

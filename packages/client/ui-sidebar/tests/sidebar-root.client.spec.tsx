@@ -116,7 +116,7 @@ describe('SidebarRoot shell', () => {
         options?.fallback ?? null) as SidebarRootComponentProps['renderSlot']}
     />)
 
-    expect(screen.getByText('DSH Local Build')).toBeTruthy()
+    expect(screen.getByText('DeepSeek Harness')).toBeTruthy()
     expect(screen.getByText('1.2.3-rc.4-0123456-dirty')).toBeTruthy()
     expect(container.querySelector('svg')).not.toBeNull()
   })
@@ -135,7 +135,7 @@ describe('SidebarRoot shell', () => {
         options?.fallback ?? null) as SidebarRootComponentProps['renderSlot']}
     />)
 
-    expect(screen.getByText('DSH Local Build')).toBeTruthy()
+    expect(screen.getByText('DeepSeek Harness')).toBeTruthy()
     expect(screen.getByText(expected)).toBeTruthy()
   })
 
@@ -149,7 +149,23 @@ describe('SidebarRoot shell', () => {
         options?.fallback ?? null) as SidebarRootComponentProps['renderSlot']}
     />)
 
-    expect(screen.getByText('DSH Local Build')).toBeTruthy()
+    expect(screen.getByText('DeepSeek Harness')).toBeTruthy()
+  })
+
+  it('projects configured product text and image into unfilled brand slots', () => {
+    vi.stubEnv('DSH_CLIENT_TITLE', 'My Harness')
+    vi.stubEnv('DSH_CLIENT_ICON_URL', '/my-mark.png')
+    render(<SidebarRoot
+      collapsed={false} width={300}
+      useSessions={neverHook} useSessionPendingInteraction={useSessionPendingInteraction}
+      useResource={useResource} useWorkspaces={neverHook}
+      startSession={vi.fn()} toggleSidebar={vi.fn()} t={t}
+      renderSlot={((_key: string, _owner: unknown, options?: { fallback?: ReactNode }) =>
+        options?.fallback ?? null) as SidebarRootComponentProps['renderSlot']}
+    />)
+
+    expect(screen.getByText('My Harness')).toBeTruthy()
+    expect(screen.getByRole('presentation', { hidden: true }).getAttribute('src')).toBe('/my-mark.png')
   })
 
   it('hands the region its wide flag and clamps expandSidebar to the collapsed state', () => {
