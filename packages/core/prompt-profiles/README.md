@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-This package keeps Agent behavior independent from model transport. It ships `codex` and `deepseek-harness` profiles, resolves Auto mode from the atomically captured provider, versions constrained custom profiles, and records the exact effective profile in every request header. It reuses the Harness agent loop, tools, permissions, project instructions, Skills, environment, and history; only the persona/working-style system-prompt section changes.
+This package keeps Agent behavior independent from model transport. It ships `codex`, `deepseek-harness`, and manually selected `flash-first` profiles, resolves Auto mode from the atomically captured provider, versions constrained custom profiles, and records the exact effective profile in every request header. It reuses the Harness agent loop, tools, permissions, project instructions, Skills, environment, and history; only the persona/working-style system-prompt section changes.
 
 ## Table of Contents
 
@@ -26,6 +26,8 @@ This package keeps Agent behavior independent from model transport. It ships `co
 Mount the service after session projections, settings, system-prompt assembly, and the default-model service. Auto maps ChatGPT/Codex and official OpenAI routes to Codex behavior; DeepSeek, compatible, and unknown routes map to Harness behavior. A manual selection stays fixed when the model changes.
 
 Custom profiles inherit one built-in base and may add instructions or choose progress/detail style. Edits append an immutable revision. Existing sessions continue naming their selected revision until explicitly changed.
+
+`flash-first` keeps routine work on the parent model and reserves model-selectable `subagent` calls for high-impact decisions, difficult root causes, milestone reviews, and release audits. For product creation it first frames the user problem, alternatives, evidence, differentiation, feasibility, smallest useful release, and measurable success; an interactive milestone can then receive a fresh-context first-time-user evaluation that gets no project intent or preferred verdict. Its specialist handoff packet separates verified facts, attempts, constraints, authority, and expected output. The profile does not choose or authorize providers: deployments keep DeepSeek-V4-Flash as the base default, while the Subagent settings allowlist controls which stronger routes the model may request.
 
 <a id="model-experience"></a>
 ## Model Experience

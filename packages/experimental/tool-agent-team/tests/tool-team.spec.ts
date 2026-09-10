@@ -24,6 +24,7 @@ import * as toolTeam from '../src/index.ts'
 const SIGNAL = new AbortController().signal
 const TOOL_NAMES = [
   'spawn_teammate',
+  'spawn_user_tester',
   'send_message',
   'list_agents',
   'wait_agent',
@@ -130,6 +131,8 @@ describe('dsh-tool-team', () => {
       .toEqual(TOOL_NAMES)
     const leadPrompt = renderPrompt(leadAssembly)
     expect(leadPrompt).toContain('create teammates only when the user explicitly asks')
+    expect(leadPrompt).toContain('time-boxed product discovery')
+    expect(leadPrompt).toContain('use spawn_user_tester')
     expect(leadPrompt).toContain('FS_STALE_VERSION')
     expect(leadPrompt).toContain('Bash, formatters, code generators, and scripts are not fully protected')
     expect(leadPrompt).toContain('Task readiness never starts an owner')
@@ -160,6 +163,43 @@ describe('dsh-tool-team', () => {
     expect(denied.isError).toBe(true)
     expect(text(denied)).toContain('only the Team Lead')
     await execute(ctx, lead, 'interrupt_agent', { target: 'tool-worker' })
+    await vi.waitFor(() => { expect(ctx.agents.get(childId)).toBeUndefined() }, { timeout: 5_000 })
+  })
+
+  it('starts a clean-room user tester with only the supplied application entry', async () => {
+    const { ctx, lead } = await setup(['hang'])
+    const spawned = await execute(ctx, lead, 'spawn_user_tester', {
+      name: 'first-time-user',
+      target: 'http://127.0.0.1:3080/',
+    })
+    expect(spawned.isError).toBe(false)
+    const childId = spawnedChildId(spawned)
+    const child = await waitRunning(ctx, childId)
+    const initialPrompt = child.session.snapshotEvents().find(event => event.type === 'user/message'
+      && event.data.source.kind === 'user')
+    const prompt = initialPrompt?.type === 'user/message'
+      ? initialPrompt.data.content.flatMap(block => block.type === 'text' ? [block.text] : []).join('')
+      : ''
+    expect(prompt).toContain('http://127.0.0.1:3080/')
+    expect(prompt).toContain('Do not read its source code')
+    expect(prompt).toContain('at most 12 tool calls total')
+    expect(prompt).toContain('Never attempt to bypass authentication')
+    expect(prompt).toContain('browser profiles, history, session stores')
+    expect(prompt).toContain('Would you choose another application instead?')
+    expect(prompt).not.toContain('DeepSeek Harness')
+    expect(ctx.agentTeams.listMembers(lead)[1]).toMatchObject({
+      name: 'first-time-user',
+      context: 'fresh',
+      provider: 'spawn',
+      description: 'Independent first-time-user evaluator',
+    })
+
+    const denied = await execute(ctx, child, 'spawn_user_tester', {
+      name: 'nested-user', target: 'http://127.0.0.1:3080/',
+    })
+    expect(denied.isError).toBe(true)
+    expect(text(denied)).toContain('only the Team Lead')
+    await execute(ctx, lead, 'interrupt_agent', { target: 'first-time-user' })
     await vi.waitFor(() => { expect(ctx.agents.get(childId)).toBeUndefined() }, { timeout: 5_000 })
   })
 

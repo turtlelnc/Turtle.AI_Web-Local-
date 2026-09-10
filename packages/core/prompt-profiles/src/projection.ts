@@ -36,7 +36,12 @@ const viewSchema = z.object({
   next: selectionSchema,
 }) as unknown as z.ZodType<PromptProfileProjection>
 
-/** Compare two explicit selection intents. */
+/**
+ * Compare two explicit selection intents.
+ * @param left - first selection to compare.
+ * @param right - second selection to compare.
+ * @returns true when both selections describe the same intent.
+ */
 export function samePromptProfileSelection(
   left: PromptProfileSelection,
   right: PromptProfileSelection,
@@ -46,7 +51,11 @@ export function samePromptProfileSelection(
   return left.profileId === right.profileId && left.revision === right.revision
 }
 
-/** Recover the selection intent represented by one effective request value. */
+/**
+ * Recover the selection intent represented by one effective request value.
+ * @param value - effective profile captured for a completed request.
+ * @returns the equivalent Auto or manual selection intent.
+ */
 export function selectionFromEffective(value: EffectivePromptProfile): PromptProfileSelection {
   return value.source === 'auto'
     ? { mode: 'auto' }
@@ -60,7 +69,12 @@ function consumed(selection: PromptProfileSelection, effective: EffectivePromptP
     && selection.revision === effective.revision
 }
 
-/** Fold one selection or request-header event into Prompt Profile state. */
+/**
+ * Fold one selection or request-header event into Prompt Profile state.
+ * @param state - current durable projection state.
+ * @param event - Session event to apply.
+ * @returns the next projection state.
+ */
 export function applyPromptProfileProjection(
   state: PromptProfileProjectionState,
   event: SessionEvent,
@@ -103,7 +117,10 @@ const promptProfileProjection = {
   stateVersion: 1,
 } satisfies ProjectionDefinition<'promptProfileSelection', PromptProfileProjectionState>
 
-/** Register the Prompt Profile projection on the shared registry. */
+/**
+ * Register the Prompt Profile projection on the shared registry.
+ * @param ctx - Cordis context exposing the shared projection registry.
+ */
 export function installPromptProfileProjection(ctx: Context): void {
   ctx.effect(() => ctx.sessionProjections.register(promptProfileProjection), 'prompt-profiles projection')
 }

@@ -163,7 +163,11 @@ export class SessionCommandController {
     })
   }
 
-  /** Validate and install one Session-local Prompt Profile selection. */
+  /**
+   * Validate and install one Session-local Prompt Profile selection.
+   * @param request - Session identity and requested Prompt Profile selection.
+   * @returns the accepted selection and whether it changed Session state.
+   */
   async selectPromptProfile(
     request: SessionSelectPromptProfileRequest,
   ): Promise<SessionSelectPromptProfileValue> {

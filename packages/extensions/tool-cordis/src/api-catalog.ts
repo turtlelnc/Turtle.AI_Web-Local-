@@ -594,6 +594,49 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'authorizationController',
+    summary: 'Host service backing the generated `ctx.remote.authorization` namespace.',
+    description: 'Host service backing the generated `ctx.remote.authorization` namespace.',
+    methods: [
+      {
+        signature: '@Remote(\'list\') async list(): Promise<AuthorizationListValue>',
+        description: 'List registered flows and redacted configured status.',
+        parameters: [],
+        returns: 'registered authorization flows with secret-free configuration state.',
+      },
+      {
+        signature: '@Remote(\'begin\') begin(request: AuthorizationBeginRequest): AuthorizationBeginValue',
+        description: 'Start a Host-owned attempt and return without waiting for login completion.',
+        parameters: [{ name: 'request', description: 'authorization flow and optional login method to start.' }],
+        returns: 'the opaque identity of the newly started attempt.',
+      },
+      {
+        signature: '@Remote(\'respond\') respond(request: AuthorizationRespondRequest): AuthorizationActionValue',
+        description: 'Answer the exact currently pending prompt.',
+        parameters: [{ name: 'request', description: 'attempt, prompt identity, and user-provided answer.' }],
+        returns: 'whether the pending prompt was changed.',
+      },
+      {
+        signature: '@Remote(\'cancel\') cancel(request: AuthorizationCancelRequest): AuthorizationActionValue',
+        description: 'Cancel one running attempt.',
+        parameters: [{ name: 'request', description: 'identity of the authorization attempt to cancel.' }],
+        returns: 'whether a running attempt was changed.',
+      },
+      {
+        signature: '@Remote({ mode: \'stream\' }) async *watch(request: AuthorizationWatchRequest, signal: AbortSignal): AsyncIterable<AuthorizationWatchFrame>',
+        description: 'Stream a reconnect baseline followed by attempt replacements.',
+        parameters: [{ name: 'request', description: 'identity of the authorization attempt to observe.' }, { name: 'signal', description: 'cancellation signal for the remote stream.' }],
+        returns: 'attempt snapshots beginning with a reconnect baseline.',
+      },
+      {
+        signature: '@Remote(\'logout\') async logout(request: AuthorizationLogoutRequest): Promise<AuthorizationActionValue>',
+        description: 'Remove a stored grant without returning its payload.',
+        parameters: [{ name: 'request', description: 'authorization flow whose stored grant should be removed.' }],
+        returns: 'whether a configured grant was removed.',
+      },
+    ],
+  },
+  {
     key: 'clientModules',
     summary: 'The web plugin table service: incremental `dsh.client` scan + wire composition + bundle route + index injection rows.',
     description: 'The web plugin table service: incremental `dsh.client` scan + wire composition + bundle route + index injection rows. Construction runs the activation scan synchronously — a malformed declaration or missing bundle among the already-loaded entries aggregates into one loud throw (FAILED fiber; the boot activation audit reports it).',
@@ -1399,6 +1442,60 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'promptProfiles',
+    summary: 'Registry and resolver for built-in and immutable custom Prompt Profiles.',
+    description: 'Registry and resolver for built-in and immutable custom Prompt Profiles.',
+    methods: [
+      {
+        signature: 'list(): PromptProfileDefinition[]',
+        description: 'List built-ins and current visible custom revisions.',
+        parameters: [],
+        returns: 'cloned profile definitions safe for callers to inspect.',
+      },
+      {
+        signature: 'defaultRules(): PromptProfileDefaultRule[]',
+        description: 'Return the ordered provider-to-profile rules used by Auto mode.',
+        parameters: [],
+        returns: 'a cloned ordered rule list.',
+      },
+      {
+        signature: 'resolve(selection: PromptProfileSelection, provider: string): PromptProfileDefinition',
+        description: 'Resolve one selection against its exact revision or provider default.',
+        parameters: [{ name: 'selection', description: 'Auto mode or an exact immutable profile revision.' }, { name: 'provider', description: 'provider identifier used when resolving Auto mode.' }],
+        returns: 'a cloned resolved Prompt Profile definition.',
+      },
+      {
+        signature: 'selectionFor(session: Session): PromptProfileSelection',
+        description: 'Read the pending or last-used selection for one Session; old logs default to Auto.',
+        parameters: [{ name: 'session', description: 'Session whose projection should be inspected.' }],
+        returns: 'the selection that will apply to its next model request.',
+      },
+      {
+        signature: 'select(session: Session, selection: PromptProfileSelection): boolean',
+        description: 'Validate and append a changed selection for the next request.',
+        parameters: [{ name: 'session', description: 'Session that owns the durable selection event.' }, { name: 'selection', description: 'Auto mode or exact profile revision to install.' }],
+        returns: 'true when a new selection event was appended.',
+      },
+      {
+        signature: 'async create(draft: PromptProfileDraft): Promise<PromptProfileDefinition>',
+        description: 'Create a custom profile at revision 1 and persist it.',
+        parameters: [{ name: 'draft', description: 'validated user-owned profile fields.' }],
+        returns: 'the persisted first immutable revision.',
+      },
+      {
+        signature: 'async update(id: PromptProfileId, draft: PromptProfileDraft): Promise<PromptProfileDefinition>',
+        description: 'Append and persist the next immutable revision of one custom profile.',
+        parameters: [{ name: 'id', description: 'existing custom profile identity.' }, { name: 'draft', description: 'replacement fields for the new revision.' }],
+        returns: 'the newly persisted immutable revision.',
+      },
+      {
+        signature: 'async remove(id: PromptProfileId): Promise<void>',
+        description: 'Hide one custom profile from catalogs while retaining immutable revisions for sessions.',
+        parameters: [{ name: 'id', description: 'custom profile identity to hide.' }],
+      },
+    ],
+  },
+  {
     key: 'sandbox',
     summary: 'Abstract process-sandbox service.',
     description: 'Abstract process-sandbox service. confine must return enforcing argv or fail closed at wrap or runner-execution time; silent unconfined passthrough is forbidden. Functional probes arbitrate multi-runner chains and may be skipped for a sole candidate, whose own refusal remains the fail-closed end.',
@@ -1480,6 +1577,36 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Select one Session-local model after explicitly resuming the Session.',
         parameters: [{ name: 'request', description: 'Session identity and requested model selection.' }],
         returns: 'the normalized selection installed for the Session.',
+      },
+      {
+        signature: '@Remote(\'selectPromptProfile\') selectPromptProfile( request: SessionSelectPromptProfileRequest, ): Promise<SessionSelectPromptProfileValue>',
+        description: 'Select Auto or one exact Prompt Profile revision for the Session\'s next request.',
+        parameters: [{ name: 'request', description: 'Session identity and requested Prompt Profile selection.' }],
+        returns: 'the accepted selection and whether it changed Session state.',
+      },
+      {
+        signature: '@Remote(\'promptProfileCatalog\') promptProfileCatalog(): PromptProfileCatalogValue',
+        description: 'List visible Prompt Profiles and the ordered Auto provider rules.',
+        parameters: [],
+        returns: 'visible profiles and the provider rules used by Auto mode.',
+      },
+      {
+        signature: '@Remote(\'createPromptProfile\') async createPromptProfile(request: PromptProfileCreateRequest): Promise<PromptProfileWriteValue>',
+        description: 'Create one custom Prompt Profile at its first immutable revision.',
+        parameters: [{ name: 'request', description: 'custom Prompt Profile draft to validate and persist.' }],
+        returns: 'the newly persisted immutable profile revision.',
+      },
+      {
+        signature: '@Remote(\'updatePromptProfile\') async updatePromptProfile(request: PromptProfileUpdateRequest): Promise<PromptProfileWriteValue>',
+        description: 'Append one immutable revision to an existing custom Prompt Profile.',
+        parameters: [{ name: 'request', description: 'custom profile identity and replacement draft.' }],
+        returns: 'the newly appended immutable profile revision.',
+      },
+      {
+        signature: '@Remote(\'removePromptProfile\') async removePromptProfile(request: PromptProfileRemoveRequest): Promise<PromptProfileRemoveValue>',
+        description: 'Hide one custom Prompt Profile while retaining revisions used by sessions.',
+        parameters: [{ name: 'request', description: 'identity of the custom profile to hide.' }],
+        returns: 'confirmation that the profile was removed from visible catalogs.',
       },
       {
         signature: '@Remote(\'modelCatalog\') modelCatalog(): Promise<ModelCatalog>',
@@ -3700,6 +3827,34 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type AttachmentId = Branded<\'AttachmentId\'>;',
   },
   {
+    name: 'AuthorizationActionValue',
+    declaration: 'export interface AuthorizationActionValue {\n    readonly changed: boolean;\n}',
+  },
+  {
+    name: 'AuthorizationAttemptId',
+    declaration: 'export type AuthorizationAttemptId = Branded<\'AuthorizationAttemptId\'>;',
+  },
+  {
+    name: 'AuthorizationAttemptSnapshot',
+    declaration: 'export interface AuthorizationAttemptSnapshot {\n    readonly attemptId: AuthorizationAttemptId;\n    readonly key: CredentialKey;\n    readonly method?: string;\n    readonly status: AuthorizationAttemptStatus;\n    readonly notice?: AuthorizationNotice;\n    readonly prompt?: AuthorizationWirePrompt;\n    readonly promptId?: string;\n    readonly error?: string;\n}',
+  },
+  {
+    name: 'AuthorizationAttemptStatus',
+    declaration: 'export type AuthorizationAttemptStatus = \'running\' | \'authorized\' | \'cancelled\' | \'failed\';',
+  },
+  {
+    name: 'AuthorizationBeginRequest',
+    declaration: 'export interface AuthorizationBeginRequest {\n    readonly key: CredentialKey;\n    readonly method?: string;\n}',
+  },
+  {
+    name: 'AuthorizationBeginValue',
+    declaration: 'export interface AuthorizationBeginValue {\n    readonly attemptId: AuthorizationAttemptId;\n}',
+  },
+  {
+    name: 'AuthorizationCancelRequest',
+    declaration: 'export interface AuthorizationCancelRequest {\n    readonly attemptId: AuthorizationAttemptId;\n}',
+  },
+  {
     name: 'AuthorizationEntry',
     declaration: 'export interface AuthorizationEntry {\n    key: CredentialKey;\n    label: string;\n    methods: readonly AuthorizationMethod[];\n    inFlight: boolean;\n}',
   },
@@ -3710,6 +3865,18 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'AuthorizationInteraction',
     declaration: 'export interface AuthorizationInteraction {\n    notify(notice: AuthorizationNotice): void;\n    prompt(prompt: AuthorizationPrompt): Promise<string>;\n}',
+  },
+  {
+    name: 'AuthorizationListEntry',
+    declaration: 'export interface AuthorizationListEntry extends AuthorizationEntry {\n    readonly configured: boolean;\n}',
+  },
+  {
+    name: 'AuthorizationListValue',
+    declaration: 'export interface AuthorizationListValue {\n    readonly entries: readonly AuthorizationListEntry[];\n}',
+  },
+  {
+    name: 'AuthorizationLogoutRequest',
+    declaration: 'export interface AuthorizationLogoutRequest {\n    readonly key: CredentialKey;\n}',
   },
   {
     name: 'AuthorizationMethod',
@@ -3736,6 +3903,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface AuthorizationRequest {\n    key: CredentialKey;\n    method?: string;\n    interaction: AuthorizationInteraction;\n    signal?: AbortSignal;\n}',
   },
   {
+    name: 'AuthorizationRespondRequest',
+    declaration: 'export interface AuthorizationRespondRequest {\n    readonly attemptId: AuthorizationAttemptId;\n    readonly promptId: string;\n    readonly answer: string;\n}',
+  },
+  {
     name: 'AuthorizationSession',
     declaration: 'export interface AuthorizationSession {\n    readonly method: string;\n    readonly signal: AbortSignal;\n    notify(notice: AuthorizationNotice): void;\n    prompt(prompt: AuthorizationPrompt): Promise<string>;\n}',
   },
@@ -3746,6 +3917,18 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'AuthorizationStatus',
     declaration: 'export type AuthorizationStatus = \'authorized\' | \'cancelled\';',
+  },
+  {
+    name: 'AuthorizationWatchFrame',
+    declaration: 'export type AuthorizationWatchFrame = {\n    readonly type: \'baseline\';\n    readonly value: AuthorizationAttemptSnapshot;\n} | {\n    readonly type: \'changed\';\n    readonly value: AuthorizationAttemptSnapshot;\n};',
+  },
+  {
+    name: 'AuthorizationWatchRequest',
+    declaration: 'export interface AuthorizationWatchRequest {\n    readonly attemptId: AuthorizationAttemptId;\n}',
+  },
+  {
+    name: 'AuthorizationWirePrompt',
+    declaration: 'export type AuthorizationWirePrompt = AuthorizationPrompt extends infer Prompt ? Prompt extends unknown ? Omit<Prompt, \'signal\'> : never : never;',
   },
   {
     name: 'BackendRegistry',
@@ -4157,7 +4340,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'EpochHeader',
-    declaration: 'export interface EpochHeader {\n    config: LlmCallConfig;\n    adapterDefaults?: LlmCallConfigAdapterDefaults;\n    system?: string;\n    tools?: ToolSchema[];\n}',
+    declaration: 'export interface EpochHeader {\n    config: LlmCallConfig;\n    adapterDefaults?: LlmCallConfigAdapterDefaults;\n    system?: string;\n    tools?: ToolSchema[];\n    metadata?: RequestHeaderMetadata;\n}',
   },
   {
     name: 'FiberState',
@@ -4773,7 +4956,15 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'PromptAssembly',
-    declaration: 'export interface PromptAssembly {\n    sections: AssembledSection[];\n    contexts: AssembledContext[];\n    tools: ToolSchema[];\n    variables: Record<string, string | undefined>;\n}',
+    declaration: 'export interface PromptAssembly {\n    sections: AssembledSection[];\n    contexts: AssembledContext[];\n    tools: ToolSchema[];\n    variables: Record<string, string | undefined>;\n    metadata?: PromptAssemblyMetadata;\n}',
+  },
+  {
+    name: 'PromptAssemblyMetadata',
+    declaration: 'export type PromptAssemblyMetadata = Partial<PromptAssemblyMetadataMap>;',
+  },
+  {
+    name: 'PromptAssemblyMetadataMap',
+    declaration: 'export interface PromptAssemblyMetadataMap {\n}',
   },
   {
     name: 'PromptContext',
@@ -4786,6 +4977,62 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'PromptFileBinding',
     declaration: 'export interface PromptFileBinding extends Disposable {\n    commit(): void;\n}',
+  },
+  {
+    name: 'PromptProfileBase',
+    declaration: 'export type PromptProfileBase = \'codex\' | \'deepseek-harness\';',
+  },
+  {
+    name: 'PromptProfileBehavior',
+    declaration: 'export interface PromptProfileBehavior {\n    readonly progressUpdates: \'inherit\' | \'concise\' | \'off\';\n    readonly responseDetail: \'inherit\' | \'concise\' | \'balanced\' | \'detailed\';\n}',
+  },
+  {
+    name: 'PromptProfileCatalogValue',
+    declaration: 'export interface PromptProfileCatalogValue {\n    readonly profiles: readonly PromptProfileDefinition[];\n    readonly defaultRules: readonly PromptProfileDefaultRule[];\n}',
+  },
+  {
+    name: 'PromptProfileCreateRequest',
+    declaration: 'export interface PromptProfileCreateRequest {\n    readonly profile: PromptProfileDraft;\n}',
+  },
+  {
+    name: 'PromptProfileDefaultRule',
+    declaration: 'export interface PromptProfileDefaultRule {\n    readonly providers: readonly string[] | \'*\';\n    readonly profileId: PromptProfileId;\n}',
+  },
+  {
+    name: 'PromptProfileDefinition',
+    declaration: 'export interface PromptProfileDefinition {\n    readonly id: PromptProfileId;\n    readonly name: string;\n    readonly base: PromptProfileBase;\n    readonly additionalInstructions: string;\n    readonly behavior: PromptProfileBehavior;\n    readonly revision: PromptProfileRevision;\n    readonly builtIn: boolean;\n}',
+  },
+  {
+    name: 'PromptProfileDraft',
+    declaration: 'export interface PromptProfileDraft {\n    readonly id?: string;\n    readonly name: string;\n    readonly base: PromptProfileBase;\n    readonly additionalInstructions: string;\n    readonly behavior: PromptProfileBehavior;\n}',
+  },
+  {
+    name: 'PromptProfileId',
+    declaration: 'export type PromptProfileId = Branded<\'PromptProfileId\'>;',
+  },
+  {
+    name: 'PromptProfileRemoveRequest',
+    declaration: 'export interface PromptProfileRemoveRequest {\n    readonly profileId: PromptProfileId;\n}',
+  },
+  {
+    name: 'PromptProfileRemoveValue',
+    declaration: 'export interface PromptProfileRemoveValue {\n    readonly removed: true;\n}',
+  },
+  {
+    name: 'PromptProfileRevision',
+    declaration: 'export type PromptProfileRevision = Branded<\'PromptProfileRevision\'>;',
+  },
+  {
+    name: 'PromptProfileSelection',
+    declaration: 'export type PromptProfileSelection = {\n    readonly mode: \'auto\';\n} | {\n    readonly mode: \'manual\';\n    readonly profileId: PromptProfileId;\n    readonly revision: PromptProfileRevision;\n};',
+  },
+  {
+    name: 'PromptProfileUpdateRequest',
+    declaration: 'export interface PromptProfileUpdateRequest {\n    readonly profileId: PromptProfileId;\n    readonly profile: PromptProfileDraft;\n}',
+  },
+  {
+    name: 'PromptProfileWriteValue',
+    declaration: 'export interface PromptProfileWriteValue {\n    readonly profile: PromptProfileDefinition;\n}',
   },
   {
     name: 'PromptSection',
@@ -4858,6 +5105,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'RequestErrorAction',
     declaration: 'export type RequestErrorAction = {\n    kind: \'retry\';\n} | undefined;',
+  },
+  {
+    name: 'RequestHeaderMetadata',
+    declaration: 'export type RequestHeaderMetadata = Partial<RequestHeaderMetadataMap>;',
+  },
+  {
+    name: 'RequestHeaderMetadataMap',
+    declaration: 'export interface RequestHeaderMetadataMap {\n}',
   },
   {
     name: 'RequestHeaderReason',
@@ -5358,6 +5613,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'SessionSelectModelValue',
     declaration: 'export interface SessionSelectModelValue {\n    readonly selected: ModelSelection;\n}',
+  },
+  {
+    name: 'SessionSelectPromptProfileRequest',
+    declaration: 'export interface SessionSelectPromptProfileRequest {\n    readonly sessionId: SessionId;\n    readonly selection: PromptProfileSelection;\n}',
+  },
+  {
+    name: 'SessionSelectPromptProfileValue',
+    declaration: 'export interface SessionSelectPromptProfileValue {\n    readonly selected: PromptProfileSelection;\n    readonly changed: boolean;\n}',
   },
   {
     name: 'SessionSeq',

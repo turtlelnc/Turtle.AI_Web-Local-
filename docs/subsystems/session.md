@@ -732,6 +732,40 @@ inspect( sessionId: SessionId, signal?: AbortSignal, ): Promise<SessionInspectio
 @Remote('selectModel') selectModel(request: SessionSelectModelRequest): Promise<SessionSelectModelValue>
 
 /**
+ * Select Auto or one exact Prompt Profile revision for the Session's next request.
+ * @param request - Session identity and requested Prompt Profile selection.
+ * @returns the accepted selection and whether it changed Session state.
+ */
+@Remote('selectPromptProfile') selectPromptProfile( request: SessionSelectPromptProfileRequest, ): Promise<SessionSelectPromptProfileValue>
+
+/**
+ * List visible Prompt Profiles and the ordered Auto provider rules.
+ * @returns visible profiles and the provider rules used by Auto mode.
+ */
+@Remote('promptProfileCatalog') promptProfileCatalog(): PromptProfileCatalogValue
+
+/**
+ * Create one custom Prompt Profile at its first immutable revision.
+ * @param request - custom Prompt Profile draft to validate and persist.
+ * @returns the newly persisted immutable profile revision.
+ */
+@Remote('createPromptProfile') async createPromptProfile(request: PromptProfileCreateRequest): Promise<PromptProfileWriteValue>
+
+/**
+ * Append one immutable revision to an existing custom Prompt Profile.
+ * @param request - custom profile identity and replacement draft.
+ * @returns the newly appended immutable profile revision.
+ */
+@Remote('updatePromptProfile') async updatePromptProfile(request: PromptProfileUpdateRequest): Promise<PromptProfileWriteValue>
+
+/**
+ * Hide one custom Prompt Profile while retaining revisions used by sessions.
+ * @param request - identity of the custom profile to hide.
+ * @returns confirmation that the profile was removed from visible catalogs.
+ */
+@Remote('removePromptProfile') async removePromptProfile(request: PromptProfileRemoveRequest): Promise<PromptProfileRemoveValue>
+
+/**
  * Describe every currently routable model for Host-generation selectors.
  * @returns provider-grouped models, the deployment default, and isolated provider failures.
  */

@@ -30,6 +30,10 @@ export const Config: z<Config> = z.object({
 /** Model-facing collaboration guidance shared by Lead and teammates. */
 const POLICY = `Agent Teams is available in this session, but create teammates only when the user explicitly asks to use Agent Teams or teammates.
 
+For a real product project, begin with a time-boxed product discovery pass before substantial implementation unless the user explicitly asks for direct execution. Identify the user problem, target users, current alternatives, evidence, assumptions, differentiators, feasibility risks, the smallest useful release, and measurable success criteria. Treat product claims as hypotheses until evidence supports them.
+
+After an interactive milestone exists, use spawn_user_tester when an independent first-time-user evaluation can change a product decision. The tester receives a fresh conversation and only the application entry supplied to the tool. Do not send it project goals, source explanations, intended workflows, prior findings, or a preferred verdict. Preserve its report before interpreting it; repeated observations matter more than a single suggested solution.
+
 The Team Lead and all teammates share the same working directory and filesystem. Edits are immediately visible to every member. Split write work into disjoint scopes, record expected write scopes on shared tasks, and use task dependencies when work must be ordered. Write-scope overlap is advisory, not a lock.
 
 Prefer read/edit/write for file changes. If a file operation returns FS_STALE_VERSION, read the current file, rebase your intended change onto the new content, and retry. Bash, formatters, code generators, and scripts are not fully protected by the filesystem version guard; coordinate them explicitly and have the Lead review the final diff and run tests.
@@ -38,6 +42,25 @@ send_message steers a running target at its nearest step boundary, starts an idl
 
 const ACTIVE_WAIT_STATUSES: ReadonlySet<TeamMemberView['status']> = new Set(['running', 'provisioning'])
 const NO_ACTIVE_PEER_MESSAGE = 'No other Team member is running or provisioning. wait_agent cannot make progress or wake inactive teammates. Re-list with list_agents and team_task_list, then use send_message to wake each required inactive teammate before waiting again.'
+
+/** Build the fixed clean-room task given to a fresh first-time-user evaluator. */
+function userTesterPrompt(target: string): string {
+  return `Open and use this application as a first-time ordinary user: ${target}
+
+Do not read its source code, repository, design documents, roadmap, developer discussion, or other agents' conclusions. Do not ask the product team what the intended workflow is before forming your own view. Use only what an ordinary user can see and operate through the application.
+
+Keep the evaluation bounded: use at most 12 tool calls total. If the entry cannot be reached normally, make at most one simple retry and then report the limitation. Never search for or guess access tokens, credentials, cookies, environment variables, browser profiles, history, session stores, or alternate authentication parameters. Never attempt to bypass authentication. Do not inspect implementation files or start a replacement server to work around an inaccessible entry.
+
+Explore freely without following a developer-provided script. Then answer:
+1. What do you think this application is for?
+2. Is it genuinely useful? What feels good or valuable?
+3. What is confusing, awkward, untrustworthy, or easy to miss?
+4. Would you keep using it? Why or why not?
+5. Would you choose another application instead? What would make that alternative better?
+6. If only three things could change, what would you change first?
+
+Separate direct observations, your reactions, and proposed improvements. Include the actions you attempted, where you hesitated or failed, and any important feature you discovered only accidentally. Give an honest verdict; do not defend the product or infer its creators' intentions.`
+}
 
 /**
  * One roster row, matching `TeamMemberView`. The Lead pseudo-row omits the
@@ -193,6 +216,27 @@ function install(agent: Agent, ctx: Context, config: Required<Config>): () => vo
           prompt: [{ type: 'text', text: args.prompt }],
           context,
           provider: context === 'fork' ? config.forkProvider : config.freshProvider,
+          signal: exec.signal,
+        })
+      },
+    })))
+
+    register(scoped.tools.register(defineTool({
+      name: 'spawn_user_tester',
+      description: 'Create a durable, fresh-context first-time-user evaluator with a fixed neutral task. Only the Team Lead may call this tool. The evaluator receives the application entry but no project history, product intent, source explanation, prescribed workflow, or preferred verdict.',
+      parameters: {
+        name: { type: 'string', required: true, description: 'Unique lower-kebab-case tester name.' },
+        target: { type: 'string', required: true, description: 'Application entry visible to an ordinary user, such as a URL or executable path. Do not include product goals or usage instructions.' },
+      },
+      output: jsonOutput(SPAWN_VALUE_SCHEMA),
+      async execute(args, exec) {
+        const agent = callingAgent(exec.agent, 'spawn_user_tester')
+        return await ctx.agentTeams.spawnTeammate(agent, {
+          name: args.name,
+          description: 'Independent first-time-user evaluator',
+          prompt: [{ type: 'text', text: userTesterPrompt(args.target) }],
+          context: 'fresh',
+          provider: config.freshProvider,
           signal: exec.signal,
         })
       },

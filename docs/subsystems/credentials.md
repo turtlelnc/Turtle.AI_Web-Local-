@@ -122,6 +122,58 @@ async begin(request: AuthorizationRequest): Promise<AuthorizationOutcome>
 
 Source: [`packages/credentials/authorization/src/index.ts`](../../packages/credentials/authorization/src/index.ts)
 
+<a id="ctxauthorizationcontroller--authorizationcontroller"></a>
+
+### `ctx.authorizationController` — `AuthorizationController`
+
+Host service backing the generated `ctx.remote.authorization` namespace.
+
+```ts cordis-catalog
+/**
+ * List registered flows and redacted configured status.
+ * @returns registered authorization flows with secret-free configuration state.
+ */
+@Remote('list') async list(): Promise<AuthorizationListValue>
+
+/**
+ * Start a Host-owned attempt and return without waiting for login completion.
+ * @param request - authorization flow and optional login method to start.
+ * @returns the opaque identity of the newly started attempt.
+ */
+@Remote('begin') begin(request: AuthorizationBeginRequest): AuthorizationBeginValue
+
+/**
+ * Answer the exact currently pending prompt.
+ * @param request - attempt, prompt identity, and user-provided answer.
+ * @returns whether the pending prompt was changed.
+ */
+@Remote('respond') respond(request: AuthorizationRespondRequest): AuthorizationActionValue
+
+/**
+ * Cancel one running attempt.
+ * @param request - identity of the authorization attempt to cancel.
+ * @returns whether a running attempt was changed.
+ */
+@Remote('cancel') cancel(request: AuthorizationCancelRequest): AuthorizationActionValue
+
+/**
+ * Stream a reconnect baseline followed by attempt replacements.
+ * @param request - identity of the authorization attempt to observe.
+ * @param signal - cancellation signal for the remote stream.
+ * @returns attempt snapshots beginning with a reconnect baseline.
+ */
+@Remote({ mode: 'stream' }) async *watch(request: AuthorizationWatchRequest, signal: AbortSignal): AsyncIterable<AuthorizationWatchFrame>
+
+/**
+ * Remove a stored grant without returning its payload.
+ * @param request - authorization flow whose stored grant should be removed.
+ * @returns whether a configured grant was removed.
+ */
+@Remote('logout') async logout(request: AuthorizationLogoutRequest): Promise<AuthorizationActionValue>
+```
+
+Source: [`packages/api/authorization-controller/src/index.ts`](../../packages/api/authorization-controller/src/index.ts)
+
 <a id="ctxcredentials--credentialprovider-abstract-seam"></a>
 
 ### `ctx.credentials` — `CredentialProvider` (abstract seam)

@@ -136,7 +136,10 @@ export class ModelDirectory {
     this.syncInputs()
   }
 
-  /** Select Auto or one immutable Prompt Profile revision. */
+  /**
+   * Select Auto or one immutable Prompt Profile revision.
+   * @param selection - selection to install for the Session's next request.
+   */
   async selectPromptProfile(selection: PromptProfileSelection): Promise<void> {
     this.assertAvailable()
     const generation = ++this.generation

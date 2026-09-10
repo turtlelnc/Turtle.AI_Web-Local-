@@ -281,6 +281,13 @@ const SERVICE_ROLES: ServiceRole[] = [
     note: 'Flows are registered by the plugin that knows how to obtain one credential and keyed by the record they write; the seam owns the conversation and the one-attempt-per-key lifecycle, never the protocol.',
   },
   {
+    key: 'authorizationController',
+    pkg: 'api-authorization-controller',
+    title: 'Host authorization Remote controller',
+    mode: 'core',
+    note: 'Projects registered login flows onto a redacted Remote surface, owns attempt cancellation and reconnect streams, and keeps credential payloads out of browser responses.',
+  },
+  {
     key: 'sessionTelemetry',
     pkg: 'session-telemetry',
     title: 'Session telemetry seam',
@@ -361,6 +368,14 @@ const SERVICE_ROLES: ServiceRole[] = [
     mode: 'core',
     consumers: ['agent-loop', 'tools', 'tool-fs', 'tool-terminal', 'tool-web'],
     note: 'Collects prompt sections and model-facing tool schemas for each step.',
+  },
+  {
+    key: 'promptProfiles',
+    pkg: 'prompt-profiles',
+    title: 'Prompt Profile registry and request resolver',
+    mode: 'core',
+    consumers: ['api-session-controller'],
+    note: 'Owns built-in and immutable custom behavior profiles, resolves Auto mode independently of provider adapters, and snapshots the effective profile into each request.',
   },
   {
     key: 'tools',

@@ -895,6 +895,74 @@ roots(): Agent[]
 
 Source: [`packages/core/agent/src/index.ts`](../../packages/core/agent/src/index.ts)
 
+<a id="ctxpromptprofiles--promptprofileregistry"></a>
+
+### `ctx.promptProfiles` — `PromptProfileRegistry`
+
+Registry and resolver for built-in and immutable custom Prompt Profiles.
+
+```ts cordis-catalog
+/**
+ * List built-ins and current visible custom revisions.
+ * @returns cloned profile definitions safe for callers to inspect.
+ */
+list(): PromptProfileDefinition[]
+
+/**
+ * Return the ordered provider-to-profile rules used by Auto mode.
+ * @returns a cloned ordered rule list.
+ */
+defaultRules(): PromptProfileDefaultRule[]
+
+/**
+ * Resolve one selection against its exact revision or provider default.
+ * @param selection - Auto mode or an exact immutable profile revision.
+ * @param provider - provider identifier used when resolving Auto mode.
+ * @returns a cloned resolved Prompt Profile definition.
+ */
+resolve(selection: PromptProfileSelection, provider: string): PromptProfileDefinition
+
+/**
+ * Read the pending or last-used selection for one Session; old logs default to Auto.
+ * @param session - Session whose projection should be inspected.
+ * @returns the selection that will apply to its next model request.
+ */
+selectionFor(session: Session): PromptProfileSelection
+
+/**
+ * Validate and append a changed selection for the next request.
+ * @param session - Session that owns the durable selection event.
+ * @param selection - Auto mode or exact profile revision to install.
+ * @returns true when a new selection event was appended.
+ */
+select(session: Session, selection: PromptProfileSelection): boolean
+
+/**
+ * Create a custom profile at revision 1 and persist it.
+ * @param draft - validated user-owned profile fields.
+ * @returns the persisted first immutable revision.
+ */
+async create(draft: PromptProfileDraft): Promise<PromptProfileDefinition>
+
+/**
+ * Append and persist the next immutable revision of one custom profile.
+ * @param id - existing custom profile identity.
+ * @param draft - replacement fields for the new revision.
+ * @returns the newly persisted immutable revision.
+ */
+async update(id: PromptProfileId, draft: PromptProfileDraft): Promise<PromptProfileDefinition>
+
+/**
+ * Hide one custom profile from catalogs while retaining immutable revisions for sessions.
+ * @param id - custom profile identity to hide.
+ */
+async remove(id: PromptProfileId): Promise<void>
+```
+
+Types: [Session](session.md)
+
+Source: [`packages/core/prompt-profiles/src/index.ts`](../../packages/core/prompt-profiles/src/index.ts)
+
 <a id="agent-events"></a>
 
 ### `agent/*` events

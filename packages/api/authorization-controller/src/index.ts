@@ -66,7 +66,10 @@ export class AuthorizationController extends TypertRemoteService {
     }, 'authorization-controller attempts')
   }
 
-  /** List registered flows and redacted configured status. */
+  /**
+   * List registered flows and redacted configured status.
+   * @returns registered authorization flows with secret-free configuration state.
+   */
   @Remote('list')
   async list(): Promise<AuthorizationListValue> {
     return {
@@ -77,7 +80,11 @@ export class AuthorizationController extends TypertRemoteService {
     }
   }
 
-  /** Start a Host-owned attempt and return without waiting for login completion. */
+  /**
+   * Start a Host-owned attempt and return without waiting for login completion.
+   * @param request - authorization flow and optional login method to start.
+   * @returns the opaque identity of the newly started attempt.
+   */
   @Remote('begin')
   begin(request: AuthorizationBeginRequest): AuthorizationBeginValue {
     const key = this.key(request.key)
@@ -104,7 +111,11 @@ export class AuthorizationController extends TypertRemoteService {
     return { attemptId }
   }
 
-  /** Answer the exact currently pending prompt. */
+  /**
+   * Answer the exact currently pending prompt.
+   * @param request - attempt, prompt identity, and user-provided answer.
+   * @returns whether the pending prompt was changed.
+   */
   @Remote('respond')
   respond(request: AuthorizationRespondRequest): AuthorizationActionValue {
     const attempt = this.attempt(request.attemptId)
@@ -119,7 +130,11 @@ export class AuthorizationController extends TypertRemoteService {
     return { changed: true }
   }
 
-  /** Cancel one running attempt. */
+  /**
+   * Cancel one running attempt.
+   * @param request - identity of the authorization attempt to cancel.
+   * @returns whether a running attempt was changed.
+   */
   @Remote('cancel')
   cancel(request: AuthorizationCancelRequest): AuthorizationActionValue {
     const attempt = this.attempt(request.attemptId)
@@ -128,7 +143,12 @@ export class AuthorizationController extends TypertRemoteService {
     return { changed: true }
   }
 
-  /** Stream a reconnect baseline followed by attempt replacements. */
+  /**
+   * Stream a reconnect baseline followed by attempt replacements.
+   * @param request - identity of the authorization attempt to observe.
+   * @param signal - cancellation signal for the remote stream.
+   * @returns attempt snapshots beginning with a reconnect baseline.
+   */
   @Remote({ mode: 'stream' })
   async *watch(request: AuthorizationWatchRequest, signal: AbortSignal): AsyncIterable<AuthorizationWatchFrame> {
     signal.throwIfAborted()
@@ -144,7 +164,11 @@ export class AuthorizationController extends TypertRemoteService {
     }
   }
 
-  /** Remove a stored grant without returning its payload. */
+  /**
+   * Remove a stored grant without returning its payload.
+   * @param request - authorization flow whose stored grant should be removed.
+   * @returns whether a configured grant was removed.
+   */
   @Remote('logout')
   async logout(request: AuthorizationLogoutRequest): Promise<AuthorizationActionValue> {
     const key = this.key(request.key)

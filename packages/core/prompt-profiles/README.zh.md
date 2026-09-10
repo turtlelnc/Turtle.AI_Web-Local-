@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-本包把 Agent 行为与模型传输解耦。它内置 `codex` 和 `deepseek-harness` Profile，基于原子快照的 Provider 解析 Auto 模式，为受约束的 Custom Profile 保留版本，并在每个请求头中记录实际 Profile。它继续复用 Harness 的 Agent Loop、工具、权限、项目指令、Skills、环境和历史；只替换 system prompt 中的 persona/工作方式层。
+本包把 Agent 行为与模型传输解耦。它内置 `codex`、`deepseek-harness` 和手动选择的 `flash-first` Profile，基于原子快照的 Provider 解析 Auto 模式，为受约束的 Custom Profile 保留版本，并在每个请求头中记录实际 Profile。它继续复用 Harness 的 Agent Loop、工具、权限、项目指令、Skills、环境和历史；只替换 system prompt 中的 persona/工作方式层。
 
 ## 目录
 
@@ -26,6 +26,8 @@ kind: "package-reference"
 在会话投影、设置、system-prompt 组装和默认模型服务之后挂载。Auto 将 ChatGPT/Codex 与官方 OpenAI 路由映射到 Codex 行为，将 DeepSeek、兼容端点和未知路由映射到 Harness 行为。手动选择不会随模型切换而改变。
 
 Custom Profile 必须继承一个内置基线，只能追加指令或选择进度/详略风格。编辑会追加不可变 revision；既有会话在明确重新选择前继续引用旧 revision。
+
+`flash-first` 让父模型承担常规工作，仅在高影响决策、疑难根因、里程碑审查和发布审计时使用可选模型的 `subagent` 调用。创建产品时，它先明确用户问题、替代方案、证据、差异化、可行性、最小可用版本和可衡量的成功标准；交互里程碑随后可以接受 fresh-context 首次用户评估，该评估不会获得项目意图或偏好结论。其专家交接包区分已验证事实、尝试结果、约束、权限范围和期望输出。该 Profile 不选择或授权 Provider：部署继续把 DeepSeek-V4-Flash 作为基础默认模型，Subagent 设置中的白名单控制模型可以请求哪些更强路由。
 
 <a id="model-experience"></a>
 ## 模型体验

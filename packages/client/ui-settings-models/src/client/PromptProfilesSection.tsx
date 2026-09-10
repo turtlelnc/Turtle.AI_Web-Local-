@@ -90,7 +90,7 @@ export function PromptProfilesSection({ remote, t }: PromptProfilesSectionProps)
               <span className={styles['rowIdentity']}>
                 <span className={styles['rowName']}>{profile.name}</span>
                 <span className={styles['rowTag']}>{profile.base}</span>
-                <span className={styles['rowTag']}>r{profile.revision}</span>
+                <span className={styles['rowTag']}>{t('profiles.revisionPrefix')}{profile.revision}</span>
               </span>
               {!profile.builtIn && (
                 <span className={styles['rowActions']}>
@@ -132,8 +132,8 @@ export function PromptProfilesSection({ remote, t }: PromptProfilesSectionProps)
                 value={draft.base}
                 onChange={(event) => { setDraft({ ...draft, base: event.target.value as PromptProfileDraft['base'] }) }}
               >
-                <option value="codex">Codex</option>
-                <option value="deepseek-harness">DeepSeek Harness</option>
+                <option value="codex">{t('profiles.base.codex')}</option>
+                <option value="deepseek-harness">{t('profiles.base.deepseekHarness')}</option>
               </select>
             </label>
             <label className={styles['field']}>

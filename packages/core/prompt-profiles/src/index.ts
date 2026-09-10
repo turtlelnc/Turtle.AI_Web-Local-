@@ -39,6 +39,9 @@ export const CODEX_PROMPT_PROFILE_ID = brandString<PromptProfileId>('codex')
 /** Built-in DeepSeek Harness Prompt Profile identity. */
 export const HARNESS_PROMPT_PROFILE_ID = brandString<PromptProfileId>('deepseek-harness')
 
+/** Built-in low-cost coordination Prompt Profile identity. */
+export const FLASH_FIRST_PROMPT_PROFILE_ID = brandString<PromptProfileId>('flash-first')
+
 const DEFAULT_RULES: readonly PromptProfileDefaultRule[] = [
   { providers: ['chatgpt-codex', 'openai', 'openai-codex'], profileId: CODEX_PROMPT_PROFILE_ID },
   { providers: '*', profileId: HARNESS_PROMPT_PROFILE_ID },
@@ -56,6 +59,40 @@ const HARNESS_PROMPT = 'You are a coding agent powered by the {{model}} model.'
 const CODEX_PROMPT = `You are a coding agent powered by the {{model}} model, running inside DeepSeek Harness.
 
 Work as an autonomous, careful collaborator. Inspect relevant files and configuration before changing code. Reuse the existing architecture and extension points. Keep the user informed with concise progress updates during longer work, continue until the requested outcome is genuinely handled, and verify changes with focused tests. Preserve unrelated work, treat destructive actions cautiously, and make failures explicit. In the final response, lead with the outcome and mention only the most useful implementation and verification details.`
+
+const FLASH_FIRST_PROMPT = `Use the current parent model as the default worker and deterministic tools as the source of facts. This profile is designed for a DeepSeek-V4-Flash parent, but model transport remains independent from these instructions.
+
+Do routine research, implementation, testing, documentation, packaging, and maintenance locally. Do not delegate merely because work is large: split mechanical work, use search, builds, tests, and logs, then continue with the parent model.
+
+When creating a real product, begin with a time-boxed discovery pass before substantial implementation unless the user explicitly asks for direct execution. Establish the user problem, target users, current alternatives, supporting evidence, assumptions, meaningful differentiation, feasibility risks, the smallest useful release, and measurable success criteria. Challenge whether the idea deserves implementation. Treat unsupported product claims as hypotheses and prefer a small reversible experiment over a broad speculative build.
+
+Once an interactive milestone exists, seek an independent first-time-user evaluation when it can change a product decision. Prefer spawn_user_tester when available. Otherwise use a fresh-context subagent and give it only the accessible application entry plus neutral questions about purpose, usefulness, friction, trust, continued use, alternatives, and the three highest-priority improvements. Do not disclose project goals, source explanations, intended workflows, prior findings, or a preferred verdict. Preserve observations separately from reactions and proposed solutions, verify repeated friction with another independent run when the decision is costly, and let the parent decide what to change.
+
+Escalate through the subagent tool only when a stronger model can materially improve a high-leverage result: an architecture, public API, migration, security, or compatibility decision; a difficult root cause that remains unresolved after two evidence-based attempts; contradictory tool evidence; a concurrency, state-machine, or cross-module contract problem; a milestone batch review; a release audit; or an independent specialist review whose value exceeds its token cost. Prefer one specialist. Run multiple subagents only for genuinely independent questions. Never repeat the same premium review without new evidence.
+
+When model-selectable delegation is available, call list_subagent_models before the first escalation and choose the least expensive authorized route that is clearly capable of the task. Supply provider and model together. Omit them when no authorized stronger route exists; never invent a route or bypass its allowlist.
+
+Every escalation prompt must be a compact handoff packet with these headings:
+TASK
+DECISION OR QUESTION
+SUCCESS CRITERIA
+CONSTRAINTS
+VERIFIED FACTS
+ATTEMPTS AND RESULTS
+SCOPE AND AUTHORITY
+EXPECTED RETURN
+
+Include only relevant paths, interfaces, commands, errors, and short evidence. Mark facts, inferences, and unknowns distinctly. Never include secrets or dump the full conversation, repository, or raw logs when a concise extract is sufficient.
+
+Require the subagent to return:
+CONCLUSION
+EVIDENCE
+RISKS AND UNKNOWNS
+RECOMMENDED ACTION
+AFFECTED FILES OR INTERFACES
+VALIDATION
+
+The parent remains responsible for the outcome. Check the returned claims against repository evidence and tools, resolve conflicts explicitly, implement or integrate the result, and run focused verification. Batch related review work by milestone. Preserve stable architecture and decisions in the project's existing concise state documents when they exist; do not create process files unless they will be maintained.`
 
 const BUILT_INS: readonly PromptProfileDefinition[] = [
   {
@@ -76,9 +113,22 @@ const BUILT_INS: readonly PromptProfileDefinition[] = [
     revision: BUILTIN_REVISION,
     builtIn: true,
   },
+  {
+    id: FLASH_FIRST_PROMPT_PROFILE_ID,
+    name: 'Flash-first',
+    base: 'deepseek-harness',
+    additionalInstructions: FLASH_FIRST_PROMPT,
+    behavior: { progressUpdates: 'concise', responseDetail: 'concise' },
+    revision: BUILTIN_REVISION,
+    builtIn: true,
+  },
 ]
 
-/** Resolve Auto mode without coupling the result to a provider adapter. */
+/**
+ * Resolve Auto mode without coupling the result to a provider adapter.
+ * @param provider - stable provider identifier selected for the request.
+ * @returns the built-in Prompt Profile identity assigned by the ordered rules.
+ */
 export function defaultPromptProfileId(provider: string): PromptProfileId {
   return DEFAULT_RULES.find(rule => rule.providers === '*'
     || rule.providers.includes(provider))?.profileId ?? HARNESS_PROMPT_PROFILE_ID
@@ -203,7 +253,10 @@ export class PromptProfileRegistry extends Service {
     }, { prepend: true })
   }
 
-  /** List built-ins and current visible custom revisions. */
+  /**
+   * List built-ins and current visible custom revisions.
+   * @returns cloned profile definitions safe for callers to inspect.
+   */
   list(): PromptProfileDefinition[] {
     const settings = this.source()
     const hidden = new Set(settings.hiddenProfileIds)
@@ -213,12 +266,20 @@ export class PromptProfileRegistry extends Service {
       .map(profile => structuredClone(profile))
   }
 
-  /** Return the ordered provider-to-profile rules used by Auto mode. */
+  /**
+   * Return the ordered provider-to-profile rules used by Auto mode.
+   * @returns a cloned ordered rule list.
+   */
   defaultRules(): PromptProfileDefaultRule[] {
     return structuredClone([...DEFAULT_RULES])
   }
 
-  /** Resolve one selection against its exact revision or provider default. */
+  /**
+   * Resolve one selection against its exact revision or provider default.
+   * @param selection - Auto mode or an exact immutable profile revision.
+   * @param provider - provider identifier used when resolving Auto mode.
+   * @returns a cloned resolved Prompt Profile definition.
+   */
   resolve(selection: PromptProfileSelection, provider: string): PromptProfileDefinition {
     if (selection.mode === 'auto') {
       const id = defaultPromptProfileId(provider)
@@ -232,14 +293,23 @@ export class PromptProfileRegistry extends Service {
     return structuredClone(profile)
   }
 
-  /** Read the pending or last-used selection for one Session; old logs default to Auto. */
+  /**
+   * Read the pending or last-used selection for one Session; old logs default to Auto.
+   * @param session - Session whose projection should be inspected.
+   * @returns the selection that will apply to its next model request.
+   */
   selectionFor(session: Session): PromptProfileSelection {
     const state = this.ctx.sessionProjections.stateOf(session, 'promptProfileSelection')
     if (state === undefined) throw new Error('prompt-profiles: required promptProfileSelection projection is unavailable')
     return state.pending ?? (state.lastUsed === null ? { mode: 'auto' } : selectionFromEffective(state.lastUsed))
   }
 
-  /** Validate and append a changed selection for the next request. */
+  /**
+   * Validate and append a changed selection for the next request.
+   * @param session - Session that owns the durable selection event.
+   * @param selection - Auto mode or exact profile revision to install.
+   * @returns true when a new selection event was appended.
+   */
   select(session: Session, selection: PromptProfileSelection): boolean {
     if (selection.mode === 'manual') this.resolve(selection, '')
     const current = this.selectionFor(session)
@@ -248,7 +318,11 @@ export class PromptProfileRegistry extends Service {
     return true
   }
 
-  /** Create a custom profile at revision 1 and persist it. */
+  /**
+   * Create a custom profile at revision 1 and persist it.
+   * @param draft - validated user-owned profile fields.
+   * @returns the persisted first immutable revision.
+   */
   async create(draft: PromptProfileDraft): Promise<PromptProfileDefinition> {
     const id = brandString<PromptProfileId>(draft.id ?? this.slug(draft.name))
     this.validateDraft(id, draft)
@@ -258,7 +332,12 @@ export class PromptProfileRegistry extends Service {
     return this.persistRevision(id, brandString<PromptProfileRevision>('1'), draft)
   }
 
-  /** Append and persist the next immutable revision of one custom profile. */
+  /**
+   * Append and persist the next immutable revision of one custom profile.
+   * @param id - existing custom profile identity.
+   * @param draft - replacement fields for the new revision.
+   * @returns the newly persisted immutable revision.
+   */
   async update(id: PromptProfileId, draft: PromptProfileDraft): Promise<PromptProfileDefinition> {
     this.validateDraft(id, draft)
     if (BUILT_INS.some(profile => profile.id === id)) throw new Error(`built-in prompt profile "${id}" cannot be edited`)
@@ -268,7 +347,10 @@ export class PromptProfileRegistry extends Service {
     return this.persistRevision(id, brandString<PromptProfileRevision>(String(next)), draft)
   }
 
-  /** Hide one custom profile from catalogs while retaining immutable revisions for sessions. */
+  /**
+   * Hide one custom profile from catalogs while retaining immutable revisions for sessions.
+   * @param id - custom profile identity to hide.
+   */
   async remove(id: PromptProfileId): Promise<void> {
     if (BUILT_INS.some(profile => profile.id === id)) throw new Error(`built-in prompt profile "${id}" cannot be removed`)
     const settings = this.source()

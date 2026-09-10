@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-10-flash-first-escalation-profile.md
+2026-09-10-flash-first-escalation-profile.md: 2d3942acdb3efec3962982bd72f2706745970c65
+2026-09-10-flash-first-escalation-profile.zh.md: 8932053db4d611b8d98945e043ef8d0de70a19fb

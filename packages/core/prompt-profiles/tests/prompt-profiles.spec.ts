@@ -3,6 +3,7 @@ import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { brandString } from '@deepseek-ai/dsh-brand'
 import {
   CODEX_PROMPT_PROFILE_ID,
+  FLASH_FIRST_PROMPT_PROFILE_ID,
   HARNESS_PROMPT_PROFILE_ID,
   defaultPromptProfileId,
 } from '../src/index.ts'
@@ -29,6 +30,11 @@ describe('Prompt Profile Auto resolver', () => {
     'maps third-party route %s to DeepSeek Harness',
     (provider) => { expect(defaultPromptProfileId(provider)).toBe(HARNESS_PROMPT_PROFILE_ID) },
   )
+
+  it('keeps Flash-first available for manual selection without changing Auto routing', () => {
+    expect(FLASH_FIRST_PROMPT_PROFILE_ID).toBe('flash-first')
+    expect(defaultPromptProfileId('deepseek-official')).not.toBe(FLASH_FIRST_PROMPT_PROFILE_ID)
+  })
 })
 
 describe('Prompt Profile session projection', () => {

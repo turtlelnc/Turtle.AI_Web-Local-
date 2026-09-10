@@ -7,6 +7,14 @@
     - img
   - button "Close":
     - img
+  - region "Progress is normal":
+    - strong: Progress is normal
+    - text: Nothing needs your attention Current status
+    - strong: Task in progress
+    - text: Progress
+    - strong: 0 / 1
+    - text: Active members
+    - strong: "0"
   - heading "Members" [level=3]
   - 'button "lead Idle · Model: deepseek-v4-flash" [disabled]'
   - heading "Shared tasks" [level=3]

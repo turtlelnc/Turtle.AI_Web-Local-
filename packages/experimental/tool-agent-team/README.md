@@ -1,5 +1,5 @@
 ---
-description: "Nine tools that let the model create, message, and coordinate teammates, for compositions mounting the experimental Team plugins."
+description: "Ten tools that let the model create, test, message, and coordinate teammates, for compositions mounting the experimental Team plugins."
 kind: "package-reference"
 ---
 
@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-`dsh-experimental-tool-agent-team` gives the model a team toolset on top of the team domain package: create named teammates, steer messages to them, see who is available, wait for progress, interrupt a stuck teammate, and manage a shared task board — nine tools in total. A short policy section in every member's prompt teaches the model when to form a team (only when you ask for one) and how to coordinate on a shared workspace. Mounting it replaces legacy subagent controls with the same tool names, so a composition that wants both must disable the legacy definitions. It is experimental: excluded from official releases, carries no stability promise, and creates teammates only when you explicitly ask for a team.
+`dsh-experimental-tool-agent-team` gives the model a team toolset on top of the team domain package: create named teammates, start an isolated first-time-user evaluation, steer messages, see who is available, wait for progress, interrupt a stuck teammate, and manage a shared task board — ten tools in total. A short policy section in every member's prompt teaches the model when to form a team, how to examine a product idea before implementation, and how to coordinate on a shared workspace. Mounting it replaces legacy subagent controls with the same tool names, so a composition that wants both must disable the legacy definitions. It is experimental: excluded from official releases and carries no stability promise.
 
 ## Table of Contents
 
@@ -25,7 +25,7 @@ English | [中文](README.zh.md)
 <a id="use-this-package"></a>
 ## Use this package
 
-Add this package on top of `@deepseek-ai/dsh-experimental-agent-team` when the model should run a team through tools. Once mounted, every team member — the Lead and each teammate — gets the same nine tools plus a policy paragraph that states its own role and name.
+Add this package on top of `@deepseek-ai/dsh-experimental-agent-team` when the model should run a team through tools. Once mounted, every team member — the Lead and each teammate — gets the same ten tools plus a policy paragraph that states its own role and name.
 
 ### When to choose it
 
@@ -54,9 +54,10 @@ Try it by asking the Lead model: "create a teammate named reviewer to check the 
 
 ### What the model can do
 
-The nine tools group into four capabilities:
+The ten tools group into five capabilities:
 
 - **Create a teammate** — `spawn_teammate` takes a name, a description, and the initial task; only the Lead can call it.
+- **Test as a new user** — `spawn_user_tester` gives a fresh teammate only an application entry and a fixed neutral evaluation task; only the Lead can call it.
 - **Send messages** — `send_message` steers a running member at its nearest step boundary, starts an idle member, and cold-resumes an inactive teammate.
 - **See and wait** — `list_agents` shows the roster with live status; `wait_agent` waits for the next team change; `interrupt_agent` stops a teammate's current turn (Lead only).
 - **Manage the task board** — `team_task_create`, `team_task_list`, `team_task_get`, and `team_task_update` add, browse, read, and update shared tasks.
@@ -91,12 +92,12 @@ The [Agent Teams Agent Note](../../../.agents/notes/implemented/feature/2026-08-
 
 | File | Role |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: config, the fixed policy text, and the nine scoped tool registrations |
+| [`src/index.ts`](src/index.ts) | Plugin entry: config, the fixed policy text, and the ten scoped tool registrations |
 | — | No runtime invariant companion is published; the Team service owns durable and authorization relations. |
 
 ### Policy and tools
 
-One `team:policy` section on the member scope teaches each member its role and the coordination rules; the fixed text and the nine tool registrations are declared in [`src/index.ts`](src/index.ts). The nine tool schemas appear only in Team member scopes, so non-Team subagents keep the default catalog. Scoped registrations with the same names as the legacy global continuable-subagent controls shadow those globals for team members only.
+One `team:policy` section on the member scope teaches each member its role, the product-discovery pass, first-time-user evaluation, and coordination rules; the fixed text and the ten tool registrations are declared in [`src/index.ts`](src/index.ts). A user tester has a twelve-tool-call ceiling and stops after one simple retry when the entry is inaccessible; it must not hunt for authentication material or alternate bypasses. The ten tool schemas appear only in Team member scopes, so non-Team subagents keep the default catalog. Scoped registrations with the same names as the legacy global continuable-subagent controls shadow those globals for team members only.
 
 ### Scoped registration and teardown
 
@@ -125,7 +126,7 @@ Read these pages when the package-level contract is not enough. They move from t
 
 #### What the model sees
 
-One stable policy section states the exact Team role/name/id, the explicit-delegation requirement, shared-cwd behavior, filesystem stale-version recovery, Bash/formatter/codegen risk, task and write-scope coordination, Steer delivery, the no-retry mailbox rule, and the Lead's duty to wait before answering. The nine Team schemas from `spawn_teammate` through `team_task_update` appear only in Team member scopes.
+One stable policy section states the exact Team role/name/id, product-discovery and clean-room user-test guidance, the explicit-delegation requirement, shared-cwd behavior, filesystem stale-version recovery, Bash/formatter/codegen risk, task and write-scope coordination, Steer delivery, the no-retry mailbox rule, and the Lead's duty to wait before answering. The ten Team schemas from `spawn_teammate` through `team_task_update` appear only in Team member scopes.
 
 #### Token effect
 
@@ -143,6 +144,7 @@ Prefix-stable while the Team plugin generation, configuration, member role/name,
 These limits describe what the policy and tools cannot guarantee for a team. They are current package constraints, not a comparison with other collaboration surfaces.
 
 - **Prompt policy is coordination, not confinement** — it cannot stop Bash or external processes from writing overlapping files.
+- **User-test isolation is informational** — the fresh conversation omits Lead history and the fixed task forbids source inspection, credential hunting, and authentication bypasses, but the teammate still runs in the shared deployment and working directory. The twelve-call budget limits accidental exploration cost; use a sandboxed UI-only provider when technical confinement is required.
 - **No autonomous team creation** — ordinary tasks do not trigger delegation unless the user explicitly requests it.
 - **No Web controls** — browser roster and task-board presentation is outside this runtime package.
 - **Experimental prototype with no stability promise** — the package is private, excluded from official releases, and its schemas change freely while it incubates.

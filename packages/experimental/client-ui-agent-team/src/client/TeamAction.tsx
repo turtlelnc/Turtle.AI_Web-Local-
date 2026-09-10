@@ -242,6 +242,11 @@ export function TeamAction({
 
   const teammates = view?.members.filter(member => member.role === 'teammate') ?? []
   const assignable = view?.members.filter(member => member.status !== 'failed' && member.status !== 'provisioning') ?? []
+  const activeMembers = view?.members.filter(member => member.status === 'running' || member.status === 'provisioning').length ?? 0
+  const completedTasks = view?.tasks.filter(task => task.status === 'completed').length ?? 0
+  const activeTask = view?.tasks.find(task => task.status === 'in_progress')
+    ?? view?.tasks.find(task => task.status === 'pending' && task.ready)
+  const needsReview = error !== null || view?.members.some(member => member.status === 'failed') === true
 
   return (
     <div className={css.root} data-team-action>
@@ -275,6 +280,27 @@ export function TeamAction({
           {loading && view === null && <div className={css.notice}>{t('loading')}</div>}
           {view !== null && (
             <>
+              <section className={css.summary} aria-label={needsReview ? t('summary.attention') : t('summary.healthy')}>
+                <div className={css.summaryHeading}>
+                  <StateDot state={needsReview ? 'error' : activeMembers > 0 ? 'ongoing' : 'done'} />
+                  <strong>{needsReview ? t('summary.attention') : t('summary.healthy')}</strong>
+                  {!needsReview && <span>{t('summary.noAction')}</span>}
+                </div>
+                <div className={css.summaryGrid}>
+                  <span>
+                    <small>{t('summary.current')}</small>
+                    <strong>{activeTask === undefined ? t('summary.waiting') : t('summary.active')}</strong>
+                  </span>
+                  <span>
+                    <small>{t('summary.progress')}</small>
+                    <strong>{completedTasks} / {view.tasks.length}</strong>
+                  </span>
+                  <span>
+                    <small>{t('summary.members')}</small>
+                    <strong>{activeMembers}</strong>
+                  </span>
+                </div>
+              </section>
               <section>
                 <h3>{t('roster')}</h3>
                 <div className={css.roster}>
@@ -293,6 +319,7 @@ export function TeamAction({
                       <span className={css.memberText}>
                         <span>{member.name}</span>
                         <small>{t(memberStatusKey(member.status))}{member.model === undefined ? '' : ` · ${t('model')}: ${member.model}`}</small>
+                        {member.description !== undefined && <small>{member.description}</small>}
                         {member.diagnostics.map(diagnostic => <small key={diagnostic} className={css.diagnostic}>{diagnostic}</small>)}
                       </span>
                     </button>
