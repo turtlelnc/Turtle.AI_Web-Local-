@@ -20,29 +20,21 @@ concurrency:
 
 jobs:
 
-  # Three enterprise jobs isolate coverage, static analysis, and the
-  # build-backed consumer tail. The consumer job owns the only Linux build so
-  # all three jobs enter runner allocation independently.
+  # These jobs isolate coverage, static analysis, and the build-backed consumer
+  # tail. The consumer job owns the only Linux build so the jobs enter runner
+  # allocation independently.
   #
-  # FAILOVER (Linux): each Linux enterprise job resolves its pool through the
-  # DSH_CI_FAILOVER_LINUX repository variable. Unset (normal), the expressions
-  # pick the hosted enterprise pools below. Setting the variable to
-  # 'selfhosted' (repo Settings → Actions → Variables; writer-manageable
-  # repository state — not PR-editable, no merge required) retargets all
-  # three onto the in-house
-  # vm-backup pool and re-running the failed jobs is the entire switch —
-  # see .agents/notes/implemented/process/2026-07-26-ci-failover-runbook.md. The
-  # in-house pool's readiness is re-proven on every master push by the
-  # serial-linux-selfhosted standby lane in ci-master.yml. The Windows failover
-  # switch is the separate DSH_CI_FAILOVER_WINDOWS variable on the windows-native
-  # job below.
+  # RUNNERS: every job here targets a standard GitHub-hosted runner. The
+  # upstream file expressed each `runs-on` through the DSH_CI_FAILOVER_LINUX /
+  # DSH_CI_FAILOVER_WINDOWS repository variables so a deployment could retarget
+  # the paid enterprise pools or the in-house vm-backup / dsh-win-ci pools.
+  # This fork registers no such pools — jobs that selected those labels never
+  # allocated a runner and held a 24-hour queue slot instead of reporting a
+  # result — so the selectors were replaced by the hosted equivalents. Restore
+  # a selector only together with the pool it names.
   node-24:
     if: github.event_name == 'pull_request'
-    runs-on: >-
-      ${{ vars.DSH_CI_FAILOVER_LINUX == 'selfhosted'
-          && github.event.pull_request.user.login != 'dependabot[bot]'
-          && fromJSON('["self-hosted", "linux", "x64", "vm-backup"]')
-          || 'dsh-ubuntu-24-04-16core' }}
+    runs-on: ubuntu-latest
     name: node 24 / static
     env:
       DSH_GATE_CONCURRENCY: '8'
@@ -99,11 +91,7 @@ jobs:
 
   node-24-coverage:
     if: github.event_name == 'pull_request'
-    runs-on: >-
-      ${{ vars.DSH_CI_FAILOVER_LINUX == 'selfhosted'
-          && github.event.pull_request.user.login != 'dependabot[bot]'
-          && fromJSON('["self-hosted", "linux", "x64", "vm-backup"]')
-          || 'dsh-ubuntu-24-04-16core' }}
+    runs-on: ubuntu-latest
     name: node 24 / coverage
     env:
       # Partitioning replaces the instrumented share; this budget gives the
@@ -216,11 +204,7 @@ jobs:
 
   node-24-consumers:
     if: github.event_name == 'pull_request'
-    runs-on: >-
-      ${{ vars.DSH_CI_FAILOVER_LINUX == 'selfhosted'
-          && github.event.pull_request.user.login != 'dependabot[bot]'
-          && fromJSON('["self-hosted", "linux", "x64", "vm-backup"]')
-          || 'dsh-ubuntu-24-04-16core' }}
+    runs-on: ubuntu-latest
     name: node 24 / snapshots and artifacts
     env:
       DSH_GATE_CONCURRENCY: '10'
@@ -313,13 +297,7 @@ jobs:
   node-compat:
     if: github.event_name == 'pull_request'
     # This job admits only repository-owned PR code to the persistent shared VM.
-    runs-on: >-
-      ${{ vars.DSH_CI_FAILOVER_LINUX == 'selfhosted'
-          && github.event.pull_request.head.repo.full_name == github.repository
-          && github.event.pull_request.head.repo.fork == false
-          && github.event.pull_request.user.login != 'dependabot[bot]'
-          && fromJSON('["self-hosted", "linux", "x64", "vm-backup"]')
-          || matrix.runner }}
+    runs-on: ${{ matrix.runner }}
     name: ${{ matrix.name }}
     env:
       DSH_GATE_CONCURRENCY: ${{ matrix.gate_concurrency }}
@@ -435,11 +413,7 @@ jobs:
   # the hosted runner.
   windows-build:
     if: github.event_name == 'pull_request'
-    runs-on: >-
-      ${{ vars.DSH_CI_FAILOVER_WINDOWS == 'selfhosted'
-          && github.event.pull_request.user.login != 'dependabot[bot]'
-          && fromJSON('["self-hosted", "dsh-win-ci", "windows"]')
-          || 'dsh-windows-2025-16core' }}
+    runs-on: windows-latest
     name: windows node 24 / build
     timeout-minutes: 60
     env:
@@ -479,11 +453,7 @@ jobs:
 
   windows-coverage:
     if: github.event_name == 'pull_request'
-    runs-on: >-
-      ${{ vars.DSH_CI_FAILOVER_WINDOWS == 'selfhosted'
-          && github.event.pull_request.user.login != 'dependabot[bot]'
-          && fromJSON('["self-hosted", "dsh-win-ci", "windows"]')
-          || 'dsh-windows-2025-16core' }}
+    runs-on: windows-latest
     name: windows node 24 / coverage
     timeout-minutes: 120
     env:
@@ -555,11 +525,7 @@ jobs:
 
   windows-native-tests:
     if: github.event_name == 'pull_request'
-    runs-on: >-
-      ${{ vars.DSH_CI_FAILOVER_WINDOWS == 'selfhosted'
-          && github.event.pull_request.user.login != 'dependabot[bot]'
-          && fromJSON('["self-hosted", "dsh-win-ci", "windows"]')
-          || 'dsh-windows-2025-16core' }}
+    runs-on: windows-latest
     name: windows node 24 / native tests
     timeout-minutes: 60
     steps:
@@ -604,11 +570,7 @@ jobs:
   windows-observational:
     if: github.event_name == 'pull_request'
     continue-on-error: true
-    runs-on: >-
-      ${{ vars.DSH_CI_FAILOVER_WINDOWS == 'selfhosted'
-          && github.event.pull_request.user.login != 'dependabot[bot]'
-          && fromJSON('["self-hosted", "dsh-win-ci", "windows"]')
-          || 'dsh-windows-2025-16core' }}
+    runs-on: windows-latest
     name: windows node 24 / observational
     timeout-minutes: 60
     env:
@@ -657,17 +619,10 @@ jobs:
   # 'cancelled' and 'skipped'.
   all-checks-passed:
     name: all checks passed
-    # This bookkeeping-only verdict must not depend on custom-pool
-    # provisioning — and under Linux failover it follows the same selector as
-    # the worker jobs it aggregates, so a standard-hosted outage cannot strand
-    # the branch-protection verdict either. It retargets with the Linux switch
-    # (DSH_CI_FAILOVER_LINUX), not the Windows one, because it aggregates the
-    # required Linux workers and runs on the vm-backup pool.
-    runs-on: >-
-      ${{ vars.DSH_CI_FAILOVER_LINUX == 'selfhosted'
-          && github.event.pull_request.user.login != 'dependabot[bot]'
-          && fromJSON('["self-hosted", "linux", "x64", "vm-backup"]')
-          || 'ubuntu-latest' }}
+    # This bookkeeping-only verdict aggregates the required Linux workers and
+    # must not depend on pool provisioning. It runs on a standard hosted runner
+    # like the workers it aggregates.
+    runs-on: ubuntu-latest
     needs: [node-24, node-24-coverage, node-24-bench, node-24-consumers, node-compat, python-sdk, python-runtime, windows-build, windows-native-tests]
     if: always() && github.event_name == 'pull_request'
     steps:

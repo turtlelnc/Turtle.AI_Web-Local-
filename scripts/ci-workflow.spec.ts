@@ -55,7 +55,7 @@ describe('CI workflow', () => {
     }
   })
 
-  it('keeps split native Windows PR jobs with failover, plus a master-only standby', () => {
+  it('keeps split native Windows PR jobs on hosted runners, plus a deactivated standby', () => {
     const workflow = loadWorkflow('.github/workflows/ci.yml')
     const masterWorkflow = loadWorkflow('.github/workflows/ci-master.yml')
     if (!isRecord(workflow.jobs)
@@ -88,14 +88,12 @@ describe('CI workflow', () => {
     if (!Array.isArray(aggregate.needs)) {
       throw new TypeError('CI aggregate must define needs')
     }
-    // The split native jobs all resolve their pool through the Windows switch.
+    // This fork registers no self-hosted or larger-runner pools, so the split
+    // native jobs run on the standard GitHub-hosted Windows image. The literal
+    // label is asserted deliberately: reintroducing a custom pool selector
+    // leaves the job queued with no result instead of failing loudly.
     for (const [jobName, job] of [['windows-build', windowsBuild], ['windows-coverage', windowsCoverage], ['windows-native-tests', windowsNativeTests], ['windows-observational', windowsObservational]] as const) {
-      expect(typeof job['runs-on']).toBe('string')
-      expect(job['runs-on'], `${jobName} runs-on must use the Windows failover switch`).toContain('DSH_CI_FAILOVER_WINDOWS')
-      expect(job['runs-on'], `${jobName} runs-on must not use the Linux failover switch`).not.toContain('DSH_CI_FAILOVER_LINUX')
-      expect(job['runs-on']).toContain('self-hosted')
-      expect(job['runs-on']).toContain('dsh-win-ci')
-      expect(job['runs-on']).toContain('dsh-windows-2025-16core')
+      expect(job['runs-on'], `${jobName} must run on the hosted Windows image`).toBe('windows-latest')
       expect(job.if).toBe("github.event_name == 'pull_request'")
     }
 
@@ -169,9 +167,12 @@ describe('CI workflow', () => {
     expect(windowsObservational.name).toBe('windows node 24 / observational')
     expect(windowsObservational['continue-on-error']).toBe(true)
 
-    // serial-windows: master-only standby, self-hosted, non-blocking, lives in ci-master.
-    expect(serialWindows.if).toBe("github.event_name == 'push' && github.ref == 'refs/heads/master'")
-    expect(serialWindows['runs-on']).toEqual(['self-hosted', 'dsh-win-ci', 'windows'])
+    // serial-windows lives in ci-master and is disabled on this fork: the
+    // `dsh-win-ci` pool it drills is not registered, and the unsharded Windows
+    // inventory cannot finish inside the job limit on a hosted runner. The
+    // `static` job in ci-master is the executable post-merge gate instead.
+    expect(serialWindows.if).toBe(false)
+    expect(serialWindows['runs-on']).toBe('windows-latest')
     expect(serialWindows.name).toBe('serial / windows (self-hosted standby)')
     // Its store must share the ReFS workspace volume for clone; the install
     // must carry the same filesystem branch as the PR jobs.
@@ -226,18 +227,13 @@ describe('CI workflow', () => {
     expect(aggregate.needs).not.toContain('windows-observational')
     expect(aggregate.needs).not.toContain('serial-windows')
 
-    // Linux failover is a separate switch: the three enterprise Linux workers
-    // and the verdict job resolve their pool through DSH_CI_FAILOVER_LINUX,
-    // never the Windows switch.
+    // With no pool to fail over to, every Linux worker and the verdict job run
+    // on the standard GitHub-hosted image. The literal label is asserted so a
+    // reintroduced selector cannot leave a required lane queued forever.
     for (const [jobName, job] of [['node-24', node24], ['node-24-coverage', node24Coverage], ['node-24-consumers', node24Consumers]] as const) {
-      expect(typeof job['runs-on']).toBe('string')
-      expect(job['runs-on'], `${jobName} runs-on must use the Linux failover switch`).toContain('DSH_CI_FAILOVER_LINUX')
-      expect(job['runs-on'], `${jobName} runs-on must not use the Windows failover switch`).not.toContain('DSH_CI_FAILOVER_WINDOWS')
-      expect(job['runs-on']).toContain('vm-backup')
+      expect(job['runs-on'], `${jobName} must run on the hosted Linux image`).toBe('ubuntu-latest')
     }
-    expect(aggregate['runs-on']).toContain('DSH_CI_FAILOVER_LINUX')
-    expect(aggregate['runs-on']).not.toContain('DSH_CI_FAILOVER_WINDOWS')
-    expect(aggregate['runs-on']).toContain('vm-backup')
+    expect(aggregate['runs-on']).toBe('ubuntu-latest')
 
     // The run-gates aggregate lanes stop at the first blocking gate failure so
     // a red aggregate does not keep burning runner time on the remaining
@@ -307,7 +303,7 @@ describe('CI workflow', () => {
     )
   })
 
-  it('exempts push from cancellation in ci-master, so one master merge does not cancel the running drill', () => {
+  it('exempts push from cancellation in ci-master, so one merge does not cancel the running gate', () => {
     const workflow = loadWorkflow('.github/workflows/ci-master.yml')
     const prWorkflow = loadWorkflow('.github/workflows/ci.yml')
     if (!isRecord(workflow.jobs) || !isRecord(workflow.concurrency)) {
@@ -349,11 +345,13 @@ describe('CI workflow', () => {
       const job = workflow.jobs[name]
       if (!isRecord(job)) throw new TypeError(`${name} must be defined`)
       expect(job.concurrency).toBeUndefined()
-      // Both stay master-push-only; that is what makes the push carve-out safe.
-      expect(job.if).toBe("github.event_name == 'push' && github.ref == 'refs/heads/master'")
+      // Both drills are disabled on this fork: their self-hosted pools are not
+      // registered, so `if: false` keeps them out of runner allocation while
+      // the job definitions stay in place for a deployment that has the pools.
+      expect(job.if).toBe(false)
     }
 
-    // Pin the post-merge runtime, Wine, and standby inventory.
+    // Pin the post-merge static, runtime, and Wine inventory.
     const NOT_PUSH_REACHABLE = new Set([
       "github.event_name == 'workflow_dispatch' && inputs.suite == 'larger-runner-benchmark'",
       "github.event_name == 'workflow_dispatch' && inputs.suite == 'consolidated-runner-benchmark'",
@@ -368,7 +366,7 @@ describe('CI workflow', () => {
       })
       .map(([name]) => name)
       .sort()
-    expect(pushReachable).toEqual(['python-runtime', 'serial-linux-selfhosted', 'serial-windows', 'windows'])
+    expect(pushReachable).toEqual(['python-runtime', 'static', 'windows'])
 
     // Why workflow_dispatch must keep cancelling: each benchmark fans out to a
     // dozen larger runners at once, in this same group on master. If it stopped

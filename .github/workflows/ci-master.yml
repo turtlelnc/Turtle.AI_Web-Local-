@@ -2,7 +2,7 @@ name: CI master
 
 on:
   push:
-    branches: [master]
+    branches: [main]
   workflow_dispatch:
     inputs:
       suite:
@@ -14,9 +14,10 @@ on:
           - larger-runner-benchmark
           - consolidated-runner-benchmark
 
-# Master runs platform runtime checks, Wine, and two self-hosted standby drills.
-# The drills outlast the interval between master merges, so
-# push is exempt from cancellation (see ci-failover-runbook). workflow_dispatch
+# Runs the post-merge static gate for `main`, platform runtime checks, and Wine.
+# The two self-hosted standby drills in the upstream file are disabled here
+# because this fork has no registered self-hosted pools (see each job).
+# Push is exempt from cancellation (see ci-failover-runbook). workflow_dispatch
 # keeps cancelling: a re-dispatched runner benchmark holds up to 12 larger
 # runners for 15 minutes in this same group.
 concurrency:
@@ -33,9 +34,54 @@ env:
   DSH_TELEMETRY_DISABLED: '1'
 
 jobs:
+  # Post-merge gate for `main`.
+  #
+  # This fork has no org-restricted larger runners and no self-hosted pools, so
+  # every upstream lane that targeted them could never allocate a runner. That
+  # left `main` with no executable required check, and the static gates drifted
+  # red unnoticed (see the fix in commit "restore green static gates on main").
+  #
+  # This job runs the same static aggregate as the PR `node 24 / static` lane on
+  # a standard GitHub-hosted runner, bounded so an unexpectedly slow gate fails
+  # visibly instead of holding a runner for the 6-hour default.
+  static:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    name: static gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      # Lower than the PR lane's 8: a standard runner has 4 vCPUs and ~16 GB,
+      # and several doc gates each build a full ts.Program.
+      DSH_GATE_CONCURRENCY: '4'
+      DSH_GATE_FAIL_FAST: '1'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Redirect Node compile cache to runner temp
+        run: echo "NODE_COMPILE_CACHE=${{ runner.temp }}/node-compile-cache" >> "$GITHUB_ENV"
+
+      - uses: pnpm/action-setup@v4
+        with:
+          dest: ${{ runner.temp }}/setup-pnpm-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.PRIMARY_NODE_VERSION }}
+
+      - name: Install (immutable)
+        run: pnpm install --frozen-lockfile
+
+      - name: Run static gates
+        env:
+          DSH_ARCHIVE_BASE_REF: ${{ github.event.before }}
+        run: pnpm run check:ci:static
+
   # These native runtime carriers are post-merge checks; release keeps all targets.
   python-runtime:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     name: python runtime / macOS and Linux ARM64
     uses: ./.github/workflows/build-exe-for-python-sdk.yml
     with:
@@ -46,7 +92,7 @@ jobs:
 
   # Wine runs once here, independently of the native serial standby aggregates.
   windows:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     name: windows node 24 / wine
     timeout-minutes: 15
@@ -134,9 +180,15 @@ jobs:
   # persistent pnpm store and tool caches make them redundant (and saving here
   # would poison the hosted cache namespace with self-hosted paths).
   serial-linux-selfhosted:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    # Disabled on this fork: this lane exists to drill the in-house `vm-backup`
+    # pool, which is not registered on a personal account. Its workload is the
+    # complete unsharded primary aggregate, which the PR lanes spread across
+    # four 16-core runners and which cannot finish inside the job limit on a
+    # standard hosted runner. The `static` job above is the executable
+    # post-merge gate instead. Re-enable only alongside a real standby pool.
+    if: false
     name: serial / linux (self-hosted standby)
-    runs-on: [self-hosted, linux, x64, vm-backup]
+    runs-on: ubuntu-latest
     steps:
       # DSH_ARCHIVE_BASE_REF below compares the frozen-archive gate against
       # github.event.before, so full history is required: depth 2 would miss it
@@ -228,9 +280,13 @@ jobs:
   # (and saving here would poison the hosted cache namespace with self-hosted
   # paths).
   serial-windows:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    # Disabled on this fork for the same reason as serial-linux-selfhosted: the
+    # `dsh-win-ci` pool is not registered here, and the complete unsharded
+    # Windows gate inventory cannot finish inside the job limit on a standard
+    # hosted runner.
+    if: false
     name: serial / windows (self-hosted standby)
-    runs-on: [self-hosted, dsh-win-ci, windows]
+    runs-on: windows-latest
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v6
@@ -293,51 +349,51 @@ jobs:
         include:
           - platform: linux
             cores: '4'
-            runner: dsh-ubuntu-24-04-4core
+            runner: ubuntu-latest
             workload: typecheck
           - platform: linux
             cores: '8'
-            runner: dsh-ubuntu-24-04-8core
+            runner: ubuntu-latest
             workload: typecheck
           - platform: linux
             cores: '16'
-            runner: dsh-ubuntu-24-04-16core
+            runner: ubuntu-latest
             workload: typecheck
           - platform: linux
             cores: '32'
-            runner: dsh-ubuntu-24-04-32core
+            runner: ubuntu-latest
             workload: typecheck
           - platform: linux
             cores: '64'
-            runner: dsh-ubuntu-24-04-64core
+            runner: ubuntu-latest
             workload: typecheck
           - platform: linux
             cores: '96'
-            runner: dsh-ubuntu-24-04-96core
+            runner: ubuntu-latest
             workload: typecheck
           - platform: windows
             cores: '4'
-            runner: dsh-windows-2025-4core
+            runner: windows-latest
             workload: production-site
           - platform: windows
             cores: '8'
-            runner: dsh-windows-2025-8core
+            runner: windows-latest
             workload: production-site
           - platform: windows
             cores: '16'
-            runner: dsh-windows-2025-16core
+            runner: windows-latest
             workload: production-site
           - platform: windows
             cores: '32'
-            runner: dsh-windows-2025-32core
+            runner: windows-latest
             workload: production-site
           - platform: windows
             cores: '64'
-            runner: dsh-windows-2025-64core
+            runner: windows-latest
             workload: production-site
           - platform: windows
             cores: '96'
-            runner: dsh-windows-2025-96core
+            runner: windows-latest
             workload: production-site
     steps:
       - uses: actions/checkout@v6
@@ -384,51 +440,51 @@ jobs:
         include:
           - platform: linux
             cores: '4'
-            runner: dsh-ubuntu-24-04-4core
+            runner: ubuntu-latest
             workers: '4'
           - platform: linux
             cores: '8'
-            runner: dsh-ubuntu-24-04-8core
+            runner: ubuntu-latest
             workers: '8'
           - platform: linux
             cores: '16'
-            runner: dsh-ubuntu-24-04-16core
+            runner: ubuntu-latest
             workers: '16'
           - platform: linux
             cores: '32'
-            runner: dsh-ubuntu-24-04-32core
+            runner: ubuntu-latest
             workers: '32'
           - platform: linux
             cores: '64'
-            runner: dsh-ubuntu-24-04-64core
+            runner: ubuntu-latest
             workers: '32'
           - platform: linux
             cores: '96'
-            runner: dsh-ubuntu-24-04-96core
+            runner: ubuntu-latest
             workers: '32'
           - platform: windows
             cores: '4'
-            runner: dsh-windows-2025-4core
+            runner: windows-latest
             workers: '2'
           - platform: windows
             cores: '8'
-            runner: dsh-windows-2025-8core
+            runner: windows-latest
             workers: '2'
           - platform: windows
             cores: '16'
-            runner: dsh-windows-2025-16core
+            runner: windows-latest
             workers: '2'
           - platform: windows
             cores: '32'
-            runner: dsh-windows-2025-32core
+            runner: windows-latest
             workers: '2'
           - platform: windows
             cores: '64'
-            runner: dsh-windows-2025-64core
+            runner: windows-latest
             workers: '2'
           - platform: windows
             cores: '96'
-            runner: dsh-windows-2025-96core
+            runner: windows-latest
             workers: '2'
     steps:
       - uses: actions/checkout@v6
