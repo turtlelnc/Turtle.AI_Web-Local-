@@ -53,3 +53,5 @@ The [fusion architecture Agent Note](../../../.agents/notes/implemented/architec
 The controller is a transport adapter only. Authentication backends own credentials and token refresh, while the Host composition owns backend selection.
 
 </details>
+
+**Runtime invariant:** No companion is published. Attempt lifecycle, credential non-exposure, and backend selection are enforced by the owning authentication backend and the Host composition, so this package exposes no same-process mutable relation for a Cordis listener to compare.

@@ -65,3 +65,5 @@ The [fusion architecture Agent Note](../../../.agents/notes/implemented/architec
 The service owns immutable profile revisions and request-time resolution; providers supply transport facts but never choose a profile.
 
 </details>
+
+**Runtime invariant:** No companion is published because profile resolution, revision immutability, and request-header recording are owned by the session and system-prompt pipeline; this package exposes no same-process mutable relation for a Cordis listener to compare.

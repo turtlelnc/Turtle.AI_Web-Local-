@@ -65,3 +65,5 @@ Custom Profile 必须继承一个内置基线，只能追加指令或选择进�
 该服务拥有不可变 Profile revision 和请求时解析；Provider 只提供传输事实，绝不选择 Profile。
 
 </details>
+
+**运行时不变式：** 不发布 companion，因为 Profile 解析、revision 不可变性与请求头记录由会话与 system-prompt 管线负责；本包不暴露可供 Cordis 监听器比较的同进程可变关系。
