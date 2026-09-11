@@ -246,6 +246,9 @@ export function TeamAction({
   const completedTasks = view?.tasks.filter(task => task.status === 'completed').length ?? 0
   const activeTask = view?.tasks.find(task => task.status === 'in_progress')
     ?? view?.tasks.find(task => task.status === 'pending' && task.ready)
+  const nextTask = view?.tasks.find(task => (
+    task.status === 'pending' && task.ready && task.id !== activeTask?.id
+  ))
   const needsReview = error !== null || view?.members.some(member => member.status === 'failed') === true
 
   return (
@@ -284,12 +287,18 @@ export function TeamAction({
                 <div className={css.summaryHeading}>
                   <StateDot state={needsReview ? 'error' : activeMembers > 0 ? 'ongoing' : 'done'} />
                   <strong>{needsReview ? t('summary.attention') : t('summary.healthy')}</strong>
-                  {!needsReview && <span>{t('summary.noAction')}</span>}
+                  <span>{needsReview ? t('summary.actionNeeded') : t('summary.noAction')}</span>
                 </div>
                 <div className={css.summaryGrid}>
                   <span>
                     <small>{t('summary.current')}</small>
-                    <strong>{activeTask === undefined ? t('summary.waiting') : t('summary.active')}</strong>
+                    <strong>{activeTask === undefined
+                      ? t('summary.waiting')
+                      : `${t('summary.active')}: ${activeTask.subject}`}</strong>
+                  </span>
+                  <span>
+                    <small>{t('summary.next')}</small>
+                    <strong>{nextTask?.subject ?? t('summary.noNext')}</strong>
                   </span>
                   <span>
                     <small>{t('summary.progress')}</small>
