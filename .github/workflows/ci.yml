@@ -402,6 +402,7 @@ jobs:
     with:
       targets: node24-linux-x64,node24-win-x64
       ci: true
+      real_api: ${{ vars.DSH_REAL_API_E2E_ENABLED == 'true' }}
     secrets:
       DEEPSEEK_API_KEY_EXTERNAL: ${{ secrets.DEEPSEEK_API_KEY_EXTERNAL }}
 

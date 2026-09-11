@@ -374,6 +374,7 @@ describe('CI workflow', () => {
       with: {
         targets: 'node24-win-x64',
         ci: true,
+        real_api: "${{ vars.DSH_REAL_API_E2E_ENABLED == 'true' }}",
       },
     })
 
@@ -444,6 +445,7 @@ describe('CI workflow', () => {
       with: {
         targets: 'node24-linux-x64,node24-win-x64',
         ci: true,
+        real_api: "${{ vars.DSH_REAL_API_E2E_ENABLED == 'true' }}",
       },
       secrets: {
         DEEPSEEK_API_KEY_EXTERNAL: '${{ secrets.DEEPSEEK_API_KEY_EXTERNAL }}',
@@ -632,6 +634,7 @@ describe('Python release workflows', () => {
     expect(call.inputs).toHaveProperty('targets')
     expect(call.inputs).toMatchObject({
       ci: { type: 'boolean', default: false },
+      real_api: { type: 'boolean', default: false },
       release: { type: 'boolean', default: false },
     })
     expect(call.secrets).toMatchObject({
@@ -683,9 +686,11 @@ describe('Python release workflows', () => {
       env: { DEEPSEEK_API_KEY: '${{ secrets.DEEPSEEK_API_KEY_EXTERNAL }}' },
     })
     expect(String(realApiPreflightPosix.if)).toContain('inputs.ci')
+    expect(String(realApiPreflightPosix.if)).toContain('inputs.real_api')
     expect(String(realApiPreflightPosix.if)).toContain('head.repo.fork')
     expect(String(realApiPreflightPosix.if)).toContain('dependabot[bot]')
     expect(realApiPreflightWindows).toMatchObject({ shell: 'pwsh' })
+    expect(String(realApiPreflightWindows.if)).toContain('inputs.real_api')
     expect(installedRealApiPosix).toMatchObject({
       env: {
         DEEPSEEK_API_KEY: '${{ secrets.DEEPSEEK_API_KEY_EXTERNAL }}',
@@ -693,8 +698,10 @@ describe('Python release workflows', () => {
       },
     })
     expect(JSON.stringify(installedRealApiPosix)).toContain('--scenario sdk-live')
+    expect(String(installedRealApiPosix.if)).toContain('inputs.real_api')
     expect(JSON.stringify(installedRealApiPosix)).toContain('-u DSH_RUNTIME_MODE')
     expect(installedRealApiWindows).toMatchObject({ shell: 'pwsh' })
+    expect(String(installedRealApiWindows.if)).toContain('inputs.real_api')
     expect(JSON.stringify(installedRealApiWindows)).toContain('--scenario sdk-live --installed-wheel')
     expect(manylinuxSmoke).toMatchObject({ if: "runner.os == 'Linux'" })
     expect(JSON.stringify(manylinuxSmoke)).toContain('-e DSH_TELEMETRY_DISABLED')
