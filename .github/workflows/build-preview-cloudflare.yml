@@ -32,6 +32,9 @@ env:
 
 jobs:
   preview:
+    # Preview publishing is optional for forks. Enable it only after configuring
+    # the Cloudflare API and Access credentials documented by this workflow.
+    if: vars.DSH_CLOUDFLARE_PREVIEW_ENABLED == 'true'
     runs-on: ubuntu-24.04
     name: cloudflare pages preview
     steps:

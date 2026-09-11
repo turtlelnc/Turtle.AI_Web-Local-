@@ -36,11 +36,12 @@ concurrency:
 jobs:
   lifecycle:
     name: Issue lifecycle
-    # Runs on every pull_request_review event so the check reports success rather
-    # than a gray "skipped" segment. The token-creating and board-mutating steps
-    # are gated at step level (a skipped step does not gray the job): only a
-    # changes_requested review drives the Project board; approved/commented
-    # reviews never mint a write-capable App token.
+    # The upstream Project automation depends on a repository-specific GitHub
+    # App. Forks opt in after installing their own App and credentials.
+    if: vars.DSH_ISSUE_AUTOMATION_ENABLED == 'true'
+    # Once enabled, token-creating and board-mutating steps remain gated at step
+    # level: only a changes_requested review drives the Project board;
+    # approved/commented reviews never mint a write-capable App token.
     runs-on: ubuntu-latest
     steps:
       - name: Check out trusted policy
@@ -55,8 +56,8 @@ jobs:
         with:
           client-id: ${{ vars.DSH_ISSUE_APP_CLIENT_ID }}
           private-key: ${{ secrets.DSH_ISSUE_APP_PRIVATE_KEY }}
-          owner: deepseek-harness
-          repositories: deepseek-harness
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
       - name: Handle repository event
         if: ${{ github.event_name != 'pull_request_review' || github.event.review.state == 'changes_requested' }}
         env:

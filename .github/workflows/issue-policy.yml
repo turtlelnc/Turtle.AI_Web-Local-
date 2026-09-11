@@ -14,6 +14,9 @@ permissions:
 jobs:
   policy:
     name: Issue policy
+    # Project metadata is optional in forks and requires a fork-owned GitHub
+    # App. The policy script remains available once explicitly enabled.
+    if: vars.DSH_ISSUE_AUTOMATION_ENABLED == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Check out trusted policy
@@ -28,8 +31,8 @@ jobs:
         with:
           client-id: ${{ vars.DSH_ISSUE_APP_CLIENT_ID }}
           private-key: ${{ secrets.DSH_ISSUE_APP_PRIVATE_KEY }}
-          owner: deepseek-harness
-          repositories: deepseek-harness
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
           permission-issues: read
           permission-organization-projects: read
       - name: Validate pull request

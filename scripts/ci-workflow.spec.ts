@@ -368,6 +368,15 @@ describe('CI workflow', () => {
       .sort()
     expect(pushReachable).toEqual(['python-runtime', 'static', 'windows'])
 
+    const postMergeRuntime = workflow.jobs['python-runtime']
+    expect(postMergeRuntime).toMatchObject({
+      name: 'python runtime / Windows x64',
+      with: {
+        targets: 'node24-win-x64',
+        ci: true,
+      },
+    })
+
     // Why workflow_dispatch must keep cancelling: each benchmark fans out to a
     // dozen larger runners at once, in this same group on master. If it stopped
     // cancelling, a re-dispatch would queue ahead of a drill instead of
@@ -452,6 +461,15 @@ describe('CI workflow', () => {
 })
 
 describe('DeepSeek e2e workflow', () => {
+  it('is an explicit fork opt-in while retaining the trusted-PR boundary', () => {
+    const workflow = loadWorkflow('.github/workflows/e2e.yml')
+    const e2e = workflowJob(workflow, 'e2e')
+
+    expect(e2e.if).toContain("vars.DSH_REAL_API_E2E_ENABLED == 'true'")
+    expect(e2e.if).toContain('github.event.pull_request.head.repo.fork')
+    expect(e2e.if).toContain("github.event.pull_request.user.login == 'dependabot[bot]'")
+  })
+
   it('prepares bubblewrap from the pinned payload without a package transaction', () => {
     const workflow = loadWorkflow('.github/workflows/e2e.yml')
     const e2e = workflowJob(workflow, 'e2e')
@@ -621,6 +639,7 @@ describe('Python release workflows', () => {
     })
     expect(workflow.concurrency).toMatchObject({
       group: 'build-single-exe-${{ github.workflow }}-${{ github.ref }}',
+      'cancel-in-progress': "${{ github.event_name != 'push' || github.ref != 'refs/heads/main' }}",
     })
     expect(build.defaults).toBeUndefined()
     expect(plan.if).toContain('inputs.ci')
@@ -734,19 +753,18 @@ describe('Python release workflows', () => {
 })
 
 describe('Issue lifecycle workflow', () => {
-  it('runs the lifecycle job on every PR/review event but gates token and board steps', () => {
+  it('keeps fork-owned Project automation opt-in and gates token and board steps', () => {
     const lifecycle = loadWorkflow('.github/workflows/issue-lifecycle.yml')
     const policy = loadWorkflow('.github/workflows/issue-policy.yml')
     const lifecycleJob = workflowJob(lifecycle, 'lifecycle')
     if (!Array.isArray(lifecycleJob.steps)) throw new TypeError('Issue lifecycle job must define steps')
 
-    // The job has no job-level `if`, so it is listed on every pull_request /
-    // pull_request_review event and reports success instead of a gray skip. The
-    // write-capable steps are gated at step level so approved/commented reviews
-    // never mint a Project/Issue App token nor touch the board.
+    // Forks do not inherit the upstream GitHub App. Once explicitly enabled,
+    // write-capable steps remain gated so approved/commented reviews never mint
+    // a Project/Issue App token nor touch the board.
     expect(lifecycle.on).toHaveProperty('pull_request')
     expect(lifecycle.on).toHaveProperty('pull_request_review')
-    expect(lifecycleJob.if).toBeUndefined()
+    expect(lifecycleJob.if).toBe("vars.DSH_ISSUE_AUTOMATION_ENABLED == 'true'")
     // Keep the subscription-type gates: issue-lifecycle does not re-subscribe
     // ready_for_review (issue-policy owns that) and only reacts to submitted
     // review events.
@@ -778,6 +796,8 @@ describe('Issue lifecycle workflow', () => {
     const humanPullRequest =
       "${{ github.event.pull_request.user.type != 'Bot' && github.event.pull_request.user.type != 'App' }}"
 
+    expect(policyJob.if).toBe("vars.DSH_ISSUE_AUTOMATION_ENABLED == 'true'")
+
     expect(tokenStep).toMatchObject({
       id: 'app-token',
       if: humanPullRequest,
@@ -785,8 +805,8 @@ describe('Issue lifecycle workflow', () => {
       with: {
         'client-id': '${{ vars.DSH_ISSUE_APP_CLIENT_ID }}',
         'private-key': '${{ secrets.DSH_ISSUE_APP_PRIVATE_KEY }}',
-        owner: 'deepseek-harness',
-        repositories: 'deepseek-harness',
+        owner: '${{ github.repository_owner }}',
+        repositories: '${{ github.event.repository.name }}',
         'permission-issues': 'read',
         'permission-organization-projects': 'read',
       },

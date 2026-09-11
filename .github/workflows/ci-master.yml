@@ -79,13 +79,14 @@ jobs:
           DSH_ARCHIVE_BASE_REF: ${{ github.event.before }}
         run: pnpm run check:ci:static
 
-  # These native runtime carriers are post-merge checks; release keeps all targets.
+  # The desktop release target is Windows x64. Keep one release-shaped runtime
+  # carrier on every main push; the release workflow still builds all targets.
   python-runtime:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    name: python runtime / macOS and Linux ARM64
+    name: python runtime / Windows x64
     uses: ./.github/workflows/build-exe-for-python-sdk.yml
     with:
-      targets: node24-linux-arm64,node24-macos-arm64,node24-macos-x64
+      targets: node24-win-x64
       ci: true
     secrets:
       DEEPSEEK_API_KEY_EXTERNAL: ${{ secrets.DEEPSEEK_API_KEY_EXTERNAL }}

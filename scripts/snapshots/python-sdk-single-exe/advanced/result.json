@@ -149,7 +149,14 @@
             "run_code",
             "subagent",
             "workflow"
-          ]
+          ],
+          "metadata": {
+            "promptProfile": {
+              "id": "deepseek-harness",
+              "revision": "builtin-1",
+              "source": "auto"
+            }
+          }
         },
         "reason": "initial"
       }
@@ -533,7 +540,14 @@
             "snapshot_double",
             "subagent",
             "workflow"
-          ]
+          ],
+          "metadata": {
+            "promptProfile": {
+              "id": "deepseek-harness",
+              "revision": "builtin-1",
+              "source": "auto"
+            }
+          }
         },
         "reason": "change"
       }
@@ -1300,7 +1314,14 @@
             "run_code",
             "subagent",
             "workflow"
-          ]
+          ],
+          "metadata": {
+            "promptProfile": {
+              "id": "deepseek-harness",
+              "revision": "builtin-1",
+              "source": "auto"
+            }
+          }
         },
         "reason": "change"
       }
@@ -1692,7 +1713,14 @@
                 "run_code",
                 "subagent",
                 "workflow"
-              ]
+              ],
+              "metadata": {
+                "promptProfile": {
+                  "id": "deepseek-harness",
+                  "revision": "builtin-1",
+                  "source": "auto"
+                }
+              }
             },
             "reason": "initial"
           }
@@ -2160,7 +2188,14 @@
                 "snapshot_double",
                 "subagent",
                 "workflow"
-              ]
+              ],
+              "metadata": {
+                "promptProfile": {
+                  "id": "deepseek-harness",
+                  "revision": "builtin-1",
+                  "source": "auto"
+                }
+              }
             },
             "reason": "change"
           }
@@ -2786,7 +2821,14 @@
                 "snapshot_double",
                 "subagent",
                 "workflow"
-              ]
+              ],
+              "metadata": {
+                "promptProfile": {
+                  "id": "deepseek-harness",
+                  "revision": "builtin-1",
+                  "source": "auto"
+                }
+              }
             },
             "reason": "initial"
           }
@@ -3445,7 +3487,14 @@
                 "snapshot_double",
                 "subagent",
                 "workflow"
-              ]
+              ],
+              "metadata": {
+                "promptProfile": {
+                  "id": "deepseek-harness",
+                  "revision": "builtin-1",
+                  "source": "auto"
+                }
+              }
             },
             "reason": "initial"
           }
@@ -3966,7 +4015,14 @@
                 "run_code",
                 "subagent",
                 "workflow"
-              ]
+              ],
+              "metadata": {
+                "promptProfile": {
+                  "id": "deepseek-harness",
+                  "revision": "builtin-1",
+                  "source": "auto"
+                }
+              }
             },
             "reason": "change"
           }
