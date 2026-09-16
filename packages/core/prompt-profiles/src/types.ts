@@ -25,6 +25,8 @@ export interface PromptProfileDefinition {
   readonly additionalInstructions: string
   readonly behavior: PromptProfileBehavior
   readonly revision: PromptProfileRevision
+  /** Built-in base revision captured by this immutable definition. */
+  readonly baseRevision?: PromptProfileRevision
   readonly builtIn: boolean
 }
 

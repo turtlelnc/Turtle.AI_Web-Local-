@@ -1822,6 +1822,15 @@ Create one named, durable teammate. Only the Team Lead may call this tool.
       "type": "string",
       "description": "Complete initial task for the teammate."
     },
+    "role": {
+      "type": "string",
+      "description": "Optional prompt-level role preset. Explorer and reviewer are instructed to remain read-only; this is guidance, not confinement.",
+      "enum": [
+        "explorer",
+        "builder",
+        "reviewer"
+      ]
+    },
     "context": {
       "type": "string",
       "description": "fresh starts without Lead history; fork inherits completed Lead turns. Defaults to fresh.",

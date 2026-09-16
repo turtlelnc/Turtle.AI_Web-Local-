@@ -240,7 +240,8 @@
 
 .taskActions select,
 .form input,
-.form textarea {
+.form textarea,
+.form select {
   box-sizing: border-box;
   border: 0.5px solid var(--dsw-alias-border-l4);
   border-radius: 6px;
@@ -271,10 +272,28 @@
 }
 
 .form input,
-.form textarea {
+.form textarea,
+.form select {
   width: 100%;
   padding: 6px 8px;
   font-size: 12px;
+}
+
+.projectCard {
+  display: grid;
+  gap: 4px;
+  padding: 9px;
+  border: 0.5px solid var(--dsw-alias-border-l1);
+  border-radius: 9px;
+  background: var(--dsw-alias-bg-base);
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+}
+
+.projectCard small,
+.help {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px;
 }
 
 .form textarea {

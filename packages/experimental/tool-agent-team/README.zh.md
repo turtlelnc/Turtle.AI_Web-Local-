@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-`dsh-experimental-tool-agent-team` 在团队领域包之上给模型一套团队工具：创建具名 teammate、启动隔离的首次用户评估、向成员 Steer 消息、查看谁在线、等待进展、中断卡住的 teammate，以及管理共享任务板——共十个工具。每个成员的提示词中都有一段简短策略，教模型何时组建团队、如何在实现前审视产品想法，以及如何在共享工作区协作。挂载它会用同名的团队工具取代旧版 subagent 控件，因此想同时使用两者的组合必须禁用旧定义。它是实验性的：不进入正式发布，也不承诺稳定性。
+`dsh-experimental-tool-agent-team` 在团队领域包之上给模型一套团队工具：创建具名 teammate、启动隔离的首次用户评估、向成员 Steer 消息、查看谁在线、等待进展、中断卡住的 teammate，以及管理共享任务板——共十个工具。一段简短策略会教每个成员如何协调、遵循所选项目预设并交换可验证的交接。挂载它会用同名的团队工具取代旧版 subagent 控件，因此想同时使用两者的组合必须禁用旧定义。它是实验性的：不进入正式发布，也不承诺稳定性。
 
 ## 目录
 
@@ -56,7 +56,7 @@ kind: "package-reference"
 
 十个工具分为五类能力：
 
-- **创建 teammate**——`spawn_teammate` 接收名字、描述与初始任务；只有 Lead 可以调用它。
+- **创建 teammate**——`spawn_teammate` 接收名字、描述、初始任务，以及可选的 `explorer`、`builder` 或 `reviewer` 提示词角色；只有 Lead 可以调用它。
 - **作为新用户测试**——`spawn_user_tester` 只向 fresh teammate 提供应用入口和固定的中性评估任务；只有 Lead 可以调用它。
 - **发送消息**——`send_message` 在最近的步骤边界 Steer running member、启动 idle member，并冷恢复 inactive teammate。
 - **查看与等待**——`list_agents` 显示带实时状态的 roster；`wait_agent` 等待下一次团队变化；`interrupt_agent` 停止 teammate 的当前轮次（仅限 Lead）。
@@ -97,7 +97,7 @@ kind: "package-reference"
 
 ### 策略与工具
 
-member scope 上的一个 `team:policy` 段落教每个成员自己的角色、产品发现过程、首次用户评估与协作规则；固定文本与十个工具注册都声明在 [`src/index.ts`](src/index.ts)。普通用户测试者最多调用十二次工具；入口不可访问时只做一次简单重试，并且不得寻找认证材料或尝试其他绕过方式。十个工具 schema 只出现在 Team member scope 中，因此非 Team subagent 保持默认目录。与旧全局 continuable-subagent 控件同名的 scoped 注册只会为团队成员覆盖这些全局控件。
+member scope 上的一个 `team:policy` 段落教每个成员自己的角色、项目预设、基于证据的产品发现、首次用户评估、协作规则与固定交接顺序；文本与十个工具注册都声明在 [`src/index.ts`](src/index.ts)。可选的 Explorer、Builder 与 Reviewer 预设会在委派任务前加上稳定的证据、写入范围或独立审查行为。Explorer 与 Reviewer 的只读措辞属于提示词指引，而非 confinement。交接会报告结果、证据、变更产物、验证、未解决风险与建议的下一步，并区分观察事实和推断。普通用户测试者最多调用十二次工具；入口不可访问时只做一次简单重试，并且不得寻找认证材料或尝试其他绕过方式。十个工具 schema 只出现在 Team member scope 中，因此非 Team subagent 保持默认目录。
 
 ### 按作用域注册与拆除
 
@@ -126,7 +126,7 @@ member scope 上的一个 `team:policy` 段落教每个成员自己的角色、�
 
 #### 模型看到什么
 
-一段稳定策略会说明确切 Team role／name／id、产品发现与净室用户测试指引、显式 delegation 要求、共享 cwd 行为、文件 stale-version 恢复、Bash／formatter／codegen 风险、task／write-scope 协调、Steer 投递、mailbox 不重试规则，以及 Lead 必须在回答前等待。`spawn_teammate` 到 `team_task_update` 的十个 Team schema 只出现在 Team member scope。
+一段稳定策略会说明确切 Team role／name／id、所选项目预设、基于证据的发现与净室用户测试指引、可选 teammate 角色语义、显式 delegation 要求、共享 cwd 行为、文件 stale-version 恢复、Bash／formatter／codegen 风险、task／write-scope 协调、交接顺序、Steer 投递、mailbox 不重试规则，以及 Lead 必须在回答前等待。`spawn_teammate` 到 `team_task_update` 的十个 Team schema 只出现在 Team member scope。
 
 #### Token 影响
 
@@ -144,6 +144,7 @@ Team 插件 generation、配置、member role／name 与 schema 不变时，前�
 这些限制说明策略与工具无法为一支团队保证什么。它们是当前包约束，不是与其他协作表面的对比。
 
 - **提示词策略只负责协调，不负责 confinement**——它无法阻止 Bash 或外部进程写入重叠文件。
+- **角色预设属于行为约束**——Explorer 与 Reviewer 会收到不得编辑的指令，但需要强制只读访问时，部署仍须使用 Provider 级沙箱。
 - **用户测试隔离是信息层面的**——fresh conversation 不含 Lead 历史，固定任务禁止检查源码、寻找凭据和绕过认证，但 teammate 仍在共享部署与工作目录中运行。十二次调用预算用于限制意外探索成本；需要技术性 confinement 时，请使用沙箱化的纯 UI Provider。
 - **不会自主创建 Team**——除非用户明确要求，普通任务不会触发 delegation。
 - **没有 Web 控制功能**——浏览器 roster 与任务板呈现不属于该运行时包。

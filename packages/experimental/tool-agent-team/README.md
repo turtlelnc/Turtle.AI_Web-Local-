@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-`dsh-experimental-tool-agent-team` gives the model a team toolset on top of the team domain package: create named teammates, start an isolated first-time-user evaluation, steer messages, see who is available, wait for progress, interrupt a stuck teammate, and manage a shared task board — ten tools in total. A short policy section in every member's prompt teaches the model when to form a team, how to examine a product idea before implementation, and how to coordinate on a shared workspace. Mounting it replaces legacy subagent controls with the same tool names, so a composition that wants both must disable the legacy definitions. It is experimental: excluded from official releases and carries no stability promise.
+`dsh-experimental-tool-agent-team` gives the model a team toolset on top of the team domain package: create named teammates, start an isolated first-time-user evaluation, steer messages, see who is available, wait for progress, interrupt a stuck teammate, and manage a shared task board — ten tools in total. A short policy section teaches every member how to coordinate, follow the selected project preset, and exchange verifiable handoffs. Mounting it replaces legacy subagent controls with the same tool names, so a composition that wants both must disable the legacy definitions. It is experimental: excluded from official releases and carries no stability promise.
 
 ## Table of Contents
 
@@ -56,7 +56,7 @@ Try it by asking the Lead model: "create a teammate named reviewer to check the 
 
 The ten tools group into five capabilities:
 
-- **Create a teammate** — `spawn_teammate` takes a name, a description, and the initial task; only the Lead can call it.
+- **Create a teammate** — `spawn_teammate` takes a name, a description, the initial task, and an optional `explorer`, `builder`, or `reviewer` prompt role; only the Lead can call it.
 - **Test as a new user** — `spawn_user_tester` gives a fresh teammate only an application entry and a fixed neutral evaluation task; only the Lead can call it.
 - **Send messages** — `send_message` steers a running member at its nearest step boundary, starts an idle member, and cold-resumes an inactive teammate.
 - **See and wait** — `list_agents` shows the roster with live status; `wait_agent` waits for the next team change; `interrupt_agent` stops a teammate's current turn (Lead only).
@@ -97,7 +97,7 @@ The [Agent Teams Agent Note](../../../.agents/notes/implemented/feature/2026-08-
 
 ### Policy and tools
 
-One `team:policy` section on the member scope teaches each member its role, the product-discovery pass, first-time-user evaluation, and coordination rules; the fixed text and the ten tool registrations are declared in [`src/index.ts`](src/index.ts). A user tester has a twelve-tool-call ceiling and stops after one simple retry when the entry is inaccessible; it must not hunt for authentication material or alternate bypasses. The ten tool schemas appear only in Team member scopes, so non-Team subagents keep the default catalog. Scoped registrations with the same names as the legacy global continuable-subagent controls shadow those globals for team members only.
+One `team:policy` section on the member scope teaches each member its role, the project preset, evidence-based product discovery, first-time-user evaluation, coordination rules, and a fixed handoff order; the text and ten tool registrations are declared in [`src/index.ts`](src/index.ts). Optional Explorer, Builder, and Reviewer presets prefix the delegated task with stable evidence, write-scope, or independent-review behavior. Explorer and Reviewer read-only wording is prompt guidance rather than confinement. A handoff reports outcome, evidence, changed artifacts, verification, unresolved risks, and the recommended next action, and separates observed facts from inference. A user tester has a twelve-tool-call ceiling and stops after one simple retry when the entry is inaccessible; it must not hunt for authentication material or alternate bypasses. The ten tool schemas appear only in Team member scopes, so non-Team subagents keep the default catalog.
 
 ### Scoped registration and teardown
 
@@ -126,7 +126,7 @@ Read these pages when the package-level contract is not enough. They move from t
 
 #### What the model sees
 
-One stable policy section states the exact Team role/name/id, product-discovery and clean-room user-test guidance, the explicit-delegation requirement, shared-cwd behavior, filesystem stale-version recovery, Bash/formatter/codegen risk, task and write-scope coordination, Steer delivery, the no-retry mailbox rule, and the Lead's duty to wait before answering. The ten Team schemas from `spawn_teammate` through `team_task_update` appear only in Team member scopes.
+One stable policy section states the exact Team role/name/id, selected project preset, evidence-based discovery and clean-room user-test guidance, optional teammate role semantics, explicit-delegation requirement, shared-cwd behavior, filesystem stale-version recovery, Bash/formatter/codegen risk, task and write-scope coordination, the handoff order, Steer delivery, the no-retry mailbox rule, and the Lead's duty to wait before answering. The ten Team schemas from `spawn_teammate` through `team_task_update` appear only in Team member scopes.
 
 #### Token effect
 
@@ -144,6 +144,7 @@ Prefix-stable while the Team plugin generation, configuration, member role/name,
 These limits describe what the policy and tools cannot guarantee for a team. They are current package constraints, not a comparison with other collaboration surfaces.
 
 - **Prompt policy is coordination, not confinement** — it cannot stop Bash or external processes from writing overlapping files.
+- **Role presets are behavioral** — Explorer and Reviewer are instructed not to edit, but deployments need provider-level sandboxing when read-only access must be enforced.
 - **User-test isolation is informational** — the fresh conversation omits Lead history and the fixed task forbids source inspection, credential hunting, and authentication bypasses, but the teammate still runs in the shared deployment and working directory. The twelve-call budget limits accidental exploration cost; use a sandboxed UI-only provider when technical confinement is required.
 - **No autonomous team creation** — ordinary tasks do not trigger delegation unless the user explicitly requests it.
 - **No Web controls** — browser roster and task-board presentation is outside this runtime package.

@@ -47,7 +47,8 @@ const DEFAULT_RULES: readonly PromptProfileDefaultRule[] = [
   { providers: '*', profileId: HARNESS_PROMPT_PROFILE_ID },
 ]
 
-const BUILTIN_REVISION = brandString<PromptProfileRevision>('builtin-1')
+const BUILTIN_REVISION_1 = brandString<PromptProfileRevision>('builtin-1')
+const BUILTIN_REVISION = brandString<PromptProfileRevision>('builtin-2')
 
 const DEFAULT_BEHAVIOR = {
   progressUpdates: 'inherit',
@@ -56,11 +57,33 @@ const DEFAULT_BEHAVIOR = {
 
 const HARNESS_PROMPT = 'You are a coding agent powered by the {{model}} model.'
 
-const CODEX_PROMPT = `You are a coding agent powered by the {{model}} model, running inside DeepSeek Harness.
+const CODEX_PROMPT_1 = `You are a coding agent powered by the {{model}} model, running inside DeepSeek Harness.
 
 Work as an autonomous, careful collaborator. Inspect relevant files and configuration before changing code. Reuse the existing architecture and extension points. Keep the user informed with concise progress updates during longer work, continue until the requested outcome is genuinely handled, and verify changes with focused tests. Preserve unrelated work, treat destructive actions cautiously, and make failures explicit. In the final response, lead with the outcome and mention only the most useful implementation and verification details.`
 
-const FLASH_FIRST_PROMPT = `Use the current parent model as the default worker and deterministic tools as the source of facts. This profile is designed for a DeepSeek-V4-Flash parent, but model transport remains independent from these instructions.
+const OBSERVABLE_WORK_POLICY = `Inspect available evidence before asking questions. Proceed autonomously with reversible, low-risk work inside the user's stated scope. Ask only when a missing answer would materially change the result, requires new authority, or makes safe progress impossible. Preserve user changes and never discard, stash, commit, publish, or otherwise take ownership of them unless the user requests that action.
+
+Before running project commands, read the repository instructions, manifests, lockfiles, and runtime constraints needed to select the correct package manager and compatible environment. Establish a baseline only in a valid environment. When a check fails, determine whether it is caused by the current change, related to the affected scope, or an independent release blocker; a pre-existing failure is evidence, not an automatic excuse or an automatic stop.
+
+Recover from errors in this order: inspect the exact evidence; make one corrected attempt when the cause is understood; try a materially different safe approach; use a fallback only when it still satisfies the user's goal; escalate to a stronger specialist when difficulty, risk, contradictory evidence, or repeated failure justifies it and an authorized budget is available; ask the user only for a material decision or missing authority. Never weaken a meaningful test merely to make it pass. Fix regressions introduced by your work without waiting for permission when the fix remains in scope.
+
+Separate verified facts, user-stated constraints, inferences, assumptions, and unknowns. Never invent account balance, token usage, cost, elapsed time, deadlines, test results, or compatibility evidence. Completion requires evidence proportionate to risk. Report the outcome, verification, and any remaining relevant risk concisely.`
+
+const CODEX_PROMPT = `You are a coding agent powered by the {{model}} model, running inside DeepSeek Harness.
+
+Work as an autonomous, careful collaborator. Reuse the existing architecture and extension points, keep the user informed with concise progress updates during longer work, and continue until the requested outcome is genuinely handled. Treat destructive or externally visible actions cautiously.
+
+${OBSERVABLE_WORK_POLICY}`
+
+const RESEARCH_POLICY = `For unfamiliar product work, research only enough to reduce a decision-relevant uncertainty. First inspect the request, repository, existing product behavior, project instructions, and constraints. Frame the user problem, intended users, current workflow and alternatives, success evidence, hard compatibility requirements, dependencies, and the smallest useful reversible milestone. Competing interpretations are unknowns: resolve them from existing evidence first, then ask only if different answers would materially change the work.
+
+Classify every important finding as a verified fact, user-stated constraint, inference, assumption, or unknown, and retain a short source or experiment for claims that affect architecture or release safety. Competitor research identifies the problem a pattern solves and its tradeoffs; never copy a feature merely because another product has it. Prefer official documentation, direct inspection, reproducible experiments, and neutral user observation. A single synthetic user or one anecdote is a signal, not proof.
+
+Time-box discovery by decision value rather than fixed percentages. Proceed when the next small milestone is clear, its major risks have a verification plan, and unresolved questions do not make the work unsafe or likely to be discarded. Narrow, redirect, or stop when a hard requirement is demonstrably impossible, requirements conflict, a critical dependency is unavailable, evidence disproves the value proposition, or required authority or budget is exhausted. Do not demand formal user approval when the user already authorized implementation and safe progress remains possible.
+
+For a research handoff, report: Problem and success evidence; Verified findings and sources; Assumptions and unknowns; Alternatives examined; Risks and mitigations; Scope boundaries; Recommended next experiment or milestone. Do not create a permanent research document unless the repository already has an appropriate maintained location or the handoff must survive the session.`
+
+const FLASH_FIRST_PROMPT_1 = `Use the current parent model as the default worker and deterministic tools as the source of facts. This profile is designed for a DeepSeek-V4-Flash parent, but model transport remains independent from these instructions.
 
 Do routine research, implementation, testing, documentation, packaging, and maintenance locally. Do not delegate merely because work is large: split mechanical work, use search, builds, tests, and logs, then continue with the parent model.
 
@@ -94,7 +117,43 @@ VALIDATION
 
 The parent remains responsible for the outcome. Check the returned claims against repository evidence and tools, resolve conflicts explicitly, implement or integrate the result, and run focused verification. Batch related review work by milestone. Preserve stable architecture and decisions in the project's existing concise state documents when they exist; do not create process files unless they will be maintained.`
 
-const BUILT_INS: readonly PromptProfileDefinition[] = [
+const FLASH_FIRST_PROMPT = `Use the current parent model as the default worker and deterministic tools as the source of facts. This profile is designed for a DeepSeek-V4-Flash parent, but model transport remains independent from these instructions.
+
+${OBSERVABLE_WORK_POLICY}
+
+${RESEARCH_POLICY}
+
+Do routine implementation, testing, documentation, packaging, and maintenance locally. Do not delegate merely because work is large: split mechanical work, use search, builds, tests, and logs, then continue with the parent model.
+
+Once an interactive milestone exists, seek an independent first-time-user evaluation when it can change a product decision. Prefer spawn_user_tester when available. Otherwise use a fresh-context subagent and give it only the accessible application entry plus neutral questions about purpose, usefulness, friction, trust, continued use, alternatives, and the three highest-priority improvements. Do not disclose project goals, source explanations, intended workflows, prior findings, or a preferred verdict. Preserve observations separately from reactions and proposed solutions, verify repeated friction with another independent run when the decision is costly, and let the parent decide what to change.
+
+Escalate through the subagent tool only when a stronger model can materially improve a high-leverage result: an architecture, public API, migration, security, or compatibility decision; a difficult root cause that remains unresolved after two evidence-based attempts; contradictory tool evidence; a concurrency, state-machine, or cross-module contract problem; a milestone batch review; a release audit; or an independent specialist review whose value exceeds its token cost. Prefer one specialist. Run multiple subagents only for genuinely independent questions. Never repeat the same premium review without new evidence.
+
+When model-selectable delegation is available, call list_subagent_models before the first escalation and choose the least expensive authorized route that is clearly capable of the task. Supply provider and model together. Omit them when no authorized stronger route exists; never invent a route or bypass its allowlist.
+
+Every escalation prompt must be a compact handoff packet with these headings:
+TASK
+DECISION OR QUESTION
+SUCCESS CRITERIA
+CONSTRAINTS
+VERIFIED FACTS
+ATTEMPTS AND RESULTS
+SCOPE AND AUTHORITY
+EXPECTED RETURN
+
+Include only relevant paths, interfaces, commands, errors, and short evidence. Mark facts, inferences, assumptions, and unknowns distinctly. Never include secrets or dump the full conversation, repository, or raw logs when a concise extract is sufficient.
+
+Require the subagent to return:
+CONCLUSION
+EVIDENCE
+RISKS AND UNKNOWNS
+RECOMMENDED ACTION
+AFFECTED FILES OR INTERFACES
+VALIDATION
+
+The parent remains responsible for the outcome. Check returned claims against repository evidence and tools, resolve conflicts explicitly, implement or integrate the result, and run focused verification. Batch related review work by milestone. Preserve stable architecture and decisions in the project's existing concise state documents when they exist; do not create process files unless they will be maintained.`
+
+const CURRENT_BUILT_INS: readonly PromptProfileDefinition[] = [
   {
     id: CODEX_PROMPT_PROFILE_ID,
     name: 'Codex',
@@ -102,6 +161,7 @@ const BUILT_INS: readonly PromptProfileDefinition[] = [
     additionalInstructions: '',
     behavior: DEFAULT_BEHAVIOR,
     revision: BUILTIN_REVISION,
+    baseRevision: BUILTIN_REVISION,
     builtIn: true,
   },
   {
@@ -111,6 +171,7 @@ const BUILT_INS: readonly PromptProfileDefinition[] = [
     additionalInstructions: '',
     behavior: DEFAULT_BEHAVIOR,
     revision: BUILTIN_REVISION,
+    baseRevision: BUILTIN_REVISION,
     builtIn: true,
   },
   {
@@ -120,9 +181,19 @@ const BUILT_INS: readonly PromptProfileDefinition[] = [
     additionalInstructions: FLASH_FIRST_PROMPT,
     behavior: { progressUpdates: 'concise', responseDetail: 'concise' },
     revision: BUILTIN_REVISION,
+    baseRevision: BUILTIN_REVISION,
     builtIn: true,
   },
 ]
+
+const HISTORICAL_BUILT_INS: readonly PromptProfileDefinition[] = CURRENT_BUILT_INS.map(profile => ({
+  ...profile,
+  additionalInstructions: profile.id === FLASH_FIRST_PROMPT_PROFILE_ID ? FLASH_FIRST_PROMPT_1 : '',
+  revision: BUILTIN_REVISION_1,
+  baseRevision: BUILTIN_REVISION_1,
+}))
+
+const BUILT_INS: readonly PromptProfileDefinition[] = [...HISTORICAL_BUILT_INS, ...CURRENT_BUILT_INS]
 
 /**
  * Resolve Auto mode without coupling the result to a provider adapter.
@@ -151,6 +222,7 @@ const definitionSchema = z.object({
   additionalInstructions: z.string().default(''),
   behavior: behaviorSchema.required(),
   revision: z.string().required(),
+  baseRevision: z.string(),
   builtIn: z.boolean().default(false),
 }) as z<PromptProfileDefinition>
 
@@ -163,7 +235,9 @@ const EMPTY_SETTINGS: PromptProfileSettings = { customProfiles: [], hiddenProfil
 const ID_PATTERN = /^[a-z][a-z0-9-]*$/
 
 function profileText(profile: PromptProfileDefinition): string {
-  const sections = [profile.base === 'codex' ? CODEX_PROMPT : HARNESS_PROMPT]
+  const baseRevision = profile.baseRevision ?? BUILTIN_REVISION_1
+  const codexPrompt = baseRevision === BUILTIN_REVISION_1 ? CODEX_PROMPT_1 : CODEX_PROMPT
+  const sections = [profile.base === 'codex' ? codexPrompt : HARNESS_PROMPT]
   if (profile.additionalInstructions.trim() !== '') sections.push(profile.additionalInstructions.trim())
   if (profile.behavior.progressUpdates === 'concise') {
     sections.push('Give brief progress updates while work is in progress.')
@@ -262,7 +336,7 @@ export class PromptProfileRegistry extends Service {
     const hidden = new Set(settings.hiddenProfileIds)
     const latest = new Map<string, PromptProfileDefinition>()
     for (const profile of settings.customProfiles) latest.set(profile.id, profile)
-    return [...BUILT_INS, ...[...latest.values()].filter(profile => !hidden.has(profile.id))]
+    return [...CURRENT_BUILT_INS, ...[...latest.values()].filter(profile => !hidden.has(profile.id))]
       .map(profile => structuredClone(profile))
   }
 
@@ -283,7 +357,7 @@ export class PromptProfileRegistry extends Service {
   resolve(selection: PromptProfileSelection, provider: string): PromptProfileDefinition {
     if (selection.mode === 'auto') {
       const id = defaultPromptProfileId(provider)
-      return structuredClone(BUILT_INS.find(profile => profile.id === id) as PromptProfileDefinition)
+      return structuredClone(CURRENT_BUILT_INS.find(profile => profile.id === id) as PromptProfileDefinition)
     }
     const profile = [...BUILT_INS, ...this.source().customProfiles].find(candidate =>
       candidate.id === selection.profileId && candidate.revision === selection.revision)
@@ -373,6 +447,7 @@ export class PromptProfileRegistry extends Service {
       additionalInstructions: draft.additionalInstructions,
       behavior: { ...draft.behavior },
       revision,
+      baseRevision: BUILTIN_REVISION,
       builtIn: false,
     }
     const settings = this.source()

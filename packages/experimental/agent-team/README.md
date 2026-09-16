@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-`dsh-experimental-agent-team` turns one coding session into a small working team: the session's agent becomes the Lead, creates named teammates for delegated work, exchanges durable messages with them, and tracks shared tasks on a common board. Messages and task state survive crashes, reloads, and interruptions, so a teammate that was offline receives its queued messages when it resumes. It provides no tools of its own — mount the sibling `dsh-experimental-tool-agent-team` so the model can create teammates, message them, and use the task board. It is experimental: excluded from official releases, carries no stability promise, and needs durable session storage to activate.
+`dsh-experimental-agent-team` turns one coding session into a small working team: the session's agent becomes the Lead, creates named teammates for delegated work, exchanges durable messages with them, and tracks shared tasks under one project preset and optional token guard. Messages, project settings, provider-reported usage, and task state survive crashes, reloads, and interruptions. It provides no tools of its own — mount the sibling `dsh-experimental-tool-agent-team` so the model can create teammates, message them, and use the task board. It is experimental: excluded from official releases, carries no stability promise, and needs durable session storage to activate.
 
 ## Table of Contents
 
@@ -78,6 +78,14 @@ Tasks have an owner: a member claims a task to start work, completes it when don
 
 File hints produce warnings when two in-progress tasks plan to touch overlapping paths — they never block anything. Deleted tasks remain in history but disappear from the active list.
 
+### Project preset and token guard
+
+The Lead can configure a named project with one built-in working mode: new product, improve an existing product, fix a problem, or freeform. The selection and its `builtin-1` revision are durable; the sibling tool package adds the selected mode to every Team member's system prompt.
+
+An optional Team-wide token limit sums the token-meter projection for every member and persists each member's latest provider-reported cumulative usage in the Lead log. Reaching the limit pauses the project, cancels live Team turns without clearing their inboxes, and rejects later model requests until the Lead raises or removes the guard. An explicit HTTP 402 or recognized provider exhaustion code also pauses a configured project; ordinary HTTP 429 rate limiting does not.
+
+This guard is not an account-balance API. The view labels normal measurements as provider-reported usage and labels an explicit exhaustion response as a provider-limit signal; it never invents a remaining currency balance or a hidden ChatGPT/Codex quota.
+
 ### Waiting and interruption
 
 A member can wait for the next team change — a teammate's status, an incoming message, or a task update — instead of polling repeatedly; the wait reports only whether it timed out, and the caller re-reads the current state afterward.
@@ -119,6 +127,7 @@ The [Agent Teams Agent Note](../../../.agents/notes/implemented/feature/2026-08-
 | [`src/task-board.ts`](src/task-board.ts) | Task CAS commands, DAG validation, and derived views |
 | [`src/journal.ts`](src/journal.ts) | Serialized Lead-log transactions and commit notification |
 | [`src/projection.ts`](src/projection.ts) | Strict replay projection that decodes and validates Team events |
+| [`src/project.ts`](src/project.ts) | Durable project presets, aggregate usage, request admission, and safe pause |
 | [`src/activity.ts`](src/activity.ts) | One-shot change waiters and disposal release |
 | [`src/lifecycle.ts`](src/lifecycle.ts) | Shared admission cutoff and bounded settlement |
 | [`src/invariant.ts`](src/invariant.ts) | Invariant companion that replays candidate events before append |
@@ -169,7 +178,7 @@ Read these pages when the package-level contract is not enough. They move from t
 
 ### Browser Remote
 
-`TeamService` owns the generated `agentTeams/view`, `agentTeams/createTask`, and `agentTeams/updateTask` Remote methods beside the roster, mailbox, task, and lifecycle operations. The `./remote` export supplies the Client contribution mounted by the Web UI, while `./client` re-exports the request, view, and task-mutation result types that are safe in a browser compilation face. Typert retains transport failures in its outer `RemoteResult`; create and update rejections remain explicit domain results inside a successful transport response, with stale update revisions distinguished as task conflicts.
+`TeamService` owns the generated `agentTeams/view`, `agentTeams/configureProject`, `agentTeams/createTask`, and `agentTeams/updateTask` Remote methods beside the roster, mailbox, task, and lifecycle operations. The `./remote` export supplies the Client contribution mounted by the Web UI, while `./client` re-exports browser-safe request, view, and mutation result types. Typert retains transport failures in its outer `RemoteResult`; project and task rejections remain explicit domain results inside a successful transport response, with stale task revisions distinguished as task conflicts.
 
 ## Model Experience
 
@@ -187,6 +196,20 @@ Each peer delivery adds the sender prefix plus message content to the target his
 
 Peer messages append after the target's reusable history prefix. Cold resume reuses the persisted conversation before appending a previously undelivered item.
 
+### Project preset
+
+#### What the model sees
+
+The selected built-in mode enters each Team member's stable Team policy section. Project and usage events remain log-only; only the concise working instruction affects model tokens.
+
+#### Token effect
+
+The selected mode adds one short policy sentence per Team request; aggregate usage and pause records add no model tokens.
+
+#### KV Cache effect
+
+The selected mode remains prefix-stable until the Lead writes another project revision; a changed preset starts a new reusable policy prefix.
+
 ## Known Limitations and Deferred Work
 
 <a id="known-limitations-and-deferred-work"></a>
@@ -200,6 +223,7 @@ These limits describe what a team cannot do yet or what needs special operationa
 - **Flat immutable roster** — only the Lead creates direct teammates; there is no nested Team, rename, deletion, or name reuse.
 - **No automatic ownership release** — idle, interruption, process exit, and failed work do not release a task owner.
 - **Mailbox is not cross-process exactly-once** — concurrent harness processes over one Team are unsupported.
+- **Token guard is not account balance** — it measures tokens reported by configured providers and reacts to explicit exhaustion responses; it cannot predict an unpublished ChatGPT/Codex reset, credit balance, or currency cost.
 
 <a id="dev-note"></a>
 ### Dev Note

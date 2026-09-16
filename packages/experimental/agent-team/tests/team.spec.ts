@@ -7,6 +7,7 @@ import type { Agent } from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import TokenMeter from '@deepseek-ai/dsh-token-meter'
 import { SessionLogOffset, SessionId, type Session, type SessionEvent } from '@deepseek-ai/dsh-session'
 import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import SubagentService from '@deepseek-ai/dsh-subagent'
@@ -61,6 +62,7 @@ async function setup(
 ) {
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
+  await ctx.plugin(TokenMeter)
   const storageRoot = mkdtempSync(join(tmpdir(), 'dsh-team-'))
   roots.push(storageRoot)
   await ctx.plugin(JsonlSessionPersistence, { root: storageRoot })
@@ -94,6 +96,10 @@ interface TeamServiceInternals {
   }
   readonly journal: {
     state(root: Agent): unknown
+  }
+  readonly project: {
+    isProviderLimit(code: string, status?: number): boolean
+    pauseForProviderLimit(agent: Agent, provider: string): Promise<boolean>
   }
   disposeRuntime(): Promise<void>
   recoverFor(agent: Agent): Promise<void>
@@ -135,6 +141,78 @@ async function waitRunning(ctx: Context, id: SessionId): Promise<Agent> {
 }
 
 describe('Team identity and provisioning', () => {
+  it('configures project presets and pauses requests at the reported token limit', async () => {
+    const { ctx, lead, adapter } = await setup([textResponse('must not run')])
+    lead.session.append('team/member-usage', {
+      version: 2,
+      teamId: TeamId(lead.id),
+      usage: { memberId: lead.id, totalTokens: 900 },
+    })
+    const configured = await ctx.agentTeams.remoteConfigureProject(lead, {
+      name: 'Harness fusion',
+      presetId: 'improve-existing',
+      limitTokens: 800,
+      warnAtRemainingTokens: 100,
+    })
+    expect(configured).toMatchObject({
+      ok: true,
+      value: { phase: 'paused', budget: { status: 'paused', usedTokens: 900, remainingTokens: 0 } },
+    })
+    expect(ctx.agentTeams.remoteView(lead).project).toMatchObject({
+      name: 'Harness fusion',
+      presetId: 'improve-existing',
+      budget: { accuracy: 'provider-reported-usage', pauseReason: 'token-budget' },
+    })
+    lead.followup(createUserMessage({ content: content('continue'), source: { kind: 'user' } }))
+    await lead.whenIdle()
+    expect(adapter.requests).toHaveLength(0)
+
+    const resumed = await ctx.agentTeams.remoteConfigureProject(lead, {
+      name: 'Harness fusion',
+      presetId: 'fix-problem',
+      limitTokens: 2_000,
+      warnAtRemainingTokens: 200,
+    })
+    expect(resumed).toMatchObject({ ok: true, value: { phase: 'active' } })
+    expect(ctx.agentTeams.projectInstruction(lead)).toContain('Reproduce the problem')
+    expect(teamInternals(ctx).project.isProviderLimit('usage_limit_reached')).toBe(true)
+    expect(teamInternals(ctx).project.isProviderLimit('RATE_LIMIT', 429)).toBe(false)
+    expect(teamInternals(ctx).project.isProviderLimit('anything', 402)).toBe(true)
+  })
+
+  it('contains concurrent provider-limit pauses and ignores roots without project protection', async () => {
+    const first = await setup([])
+    expect(await teamInternals(first.ctx).project.pauseForProviderLimit(first.lead, 'mock')).toBe(false)
+
+    const second = await setup([])
+    await expect(second.ctx.agentTeams.remoteConfigureProject(second.lead, {
+      name: 'Protected', presetId: 'freeform', limitTokens: 1_000, warnAtRemainingTokens: 0,
+    })).resolves.toMatchObject({ ok: true, value: { phase: 'active' } })
+    await expect(Promise.all([
+      teamInternals(second.ctx).project.pauseForProviderLimit(second.lead, 'mock'),
+      teamInternals(second.ctx).project.pauseForProviderLimit(second.lead, 'mock'),
+    ])).resolves.toEqual([true, true])
+    expect(second.ctx.agentTeams.remoteView(second.lead).project).toMatchObject({
+      revision: 2,
+      phase: 'paused',
+      budget: { accuracy: 'provider-limit-signal', pauseReason: 'provider-limit', provider: 'mock' },
+    })
+  })
+
+  it('rejects invalid and teammate-owned project configuration', async () => {
+    const { ctx, lead } = await setup(['hang'])
+    await expect(ctx.agentTeams.remoteConfigureProject(lead, {
+      name: 'Invalid', presetId: 'freeform', limitTokens: 100, warnAtRemainingTokens: 100,
+    })).resolves.toMatchObject({ ok: false, error: { code: 'team-rejected' } })
+    const child = (await spawn(ctx, lead, 'project-worker')).member
+    const worker = await waitRunning(ctx, child.id)
+    await expect(ctx.agentTeams.remoteConfigureProject(worker, {
+      name: 'Denied', presetId: 'freeform',
+    })).resolves.toMatchObject({ ok: false, error: { code: 'team-rejected' } })
+    lead.cancel({ kind: 'parent' })
+    worker.cancel({ kind: 'parent' })
+  })
+
   it('rejects missing and failed authoritative Team projections', async () => {
     const first = await setup([])
     const journal = teamInternals(first.ctx).journal
@@ -168,6 +246,7 @@ describe('Team identity and provisioning', () => {
   it('supports direct-constructor defaults and recovers roots that already exist', async () => {
     const ctx = new Context()
     await mountAgentLoopTestDependencies(ctx)
+    await ctx.plugin(TokenMeter)
     const storageRoot = mkdtempSync(join(tmpdir(), 'dsh-team-direct-'))
     roots.push(storageRoot)
     await ctx.plugin(JsonlSessionPersistence, { root: storageRoot })
@@ -1408,6 +1487,7 @@ describe('Team mailbox and waiting', () => {
   it('waits for one change, supports cancellation, times out, and releases waiters on HMR disposal', async () => {
     const ctx = new Context()
     await mountAgentLoopTestDependencies(ctx)
+    await ctx.plugin(TokenMeter)
     const storageRoot = mkdtempSync(join(tmpdir(), 'dsh-team-wait-'))
     roots.push(storageRoot)
     await ctx.plugin(JsonlSessionPersistence, { root: storageRoot })

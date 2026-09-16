@@ -8,8 +8,10 @@ import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
 import type {
   TeamId,
   TeamMemberSnapshot,
+  TeamMemberUsageSnapshot,
   TeamMessageId,
   TeamMessageSnapshot,
+  TeamProjectSnapshot,
   TeamTaskSnapshot,
 } from './types.ts'
 import {
@@ -123,6 +125,39 @@ const teamMessageDeliveredEventSchema = z.object({
   targetId: sessionIdSchema,
 }).strict() as z.ZodType<SessionEventMap['team/message/delivered']>
 
+const teamTokenBudgetSchema = z.object({
+  limitTokens: positiveSafeInteger,
+  warnAtRemainingTokens: nonNegativeSafeInteger,
+}).strict()
+
+const teamProjectSnapshotSchema = z.object({
+  revision: positiveSafeInteger,
+  name: z.string(),
+  presetId: z.enum(['new-product', 'improve-existing', 'fix-problem', 'freeform']),
+  presetRevision: z.literal('builtin-1'),
+  tokenBudget: teamTokenBudgetSchema.optional(),
+  phase: z.enum(['active', 'paused']),
+  pauseReason: z.enum(['token-budget', 'provider-limit']).optional(),
+  provider: z.string().optional(),
+}).strict() as z.ZodType<TeamProjectSnapshot>
+
+const teamMemberUsageSnapshotSchema = z.object({
+  memberId: sessionIdSchema,
+  totalTokens: nonNegativeSafeInteger,
+}).strict() as z.ZodType<TeamMemberUsageSnapshot>
+
+const teamProjectEventSchema = z.object({
+  version: z.literal(2),
+  teamId: teamIdSchema,
+  project: teamProjectSnapshotSchema,
+}).strict() as z.ZodType<SessionEventMap['team/project']>
+
+const teamMemberUsageEventSchema = z.object({
+  version: z.literal(2),
+  teamId: teamIdSchema,
+  usage: teamMemberUsageSnapshotSchema,
+}).strict() as z.ZodType<SessionEventMap['team/member-usage']>
+
 /** Current Team state selected by durable Team identity. */
 export interface TeamState {
   readonly id: TeamId
@@ -130,6 +165,8 @@ export interface TeamState {
   readonly tasks: TeamTaskSnapshot[]
   readonly messages: TeamMessageSnapshot[]
   readonly delivered: TeamMessageId[]
+  project?: TeamProjectSnapshot
+  readonly memberUsage: TeamMemberUsageSnapshot[]
   nextTaskNumber: number
 }
 
@@ -145,6 +182,7 @@ export function emptyTeamState(rootId: SessionId): TeamProjectionState {
     tasks: [],
     messages: [],
     delivered: [],
+    memberUsage: [],
     nextTaskNumber: 1,
   }
 }
@@ -166,6 +204,8 @@ const teamProjectionEntrySchema = z.object({
   tasks: z.array(teamTaskSnapshotSchema),
   messages: z.array(teamMessageSnapshotSchema),
   delivered: z.array(teamMessageIdSchema),
+  project: teamProjectSnapshotSchema.optional(),
+  memberUsage: z.array(teamMemberUsageSnapshotSchema),
   nextTaskNumber: positiveSafeInteger,
   failure: z.string().optional(),
 }).strict() as z.ZodType<TeamProjectionState>
@@ -176,6 +216,8 @@ export type TeamEventType =
   | 'team/task'
   | 'team/message/queued'
   | 'team/message/delivered'
+  | 'team/project'
+  | 'team/member-usage'
 
 /** One event owned by the Team domain. */
 type TeamSessionEvent = SessionEvent<TeamEventType>
@@ -190,6 +232,8 @@ export function isTeamEvent(event: SessionEvent): event is TeamSessionEvent {
     || event.type === 'team/task'
     || event.type === 'team/message/queued'
     || event.type === 'team/message/delivered'
+    || event.type === 'team/project'
+    || event.type === 'team/member-usage'
 }
 
 /** Decode one persisted Team value and retain the schema failure as its cause. */
@@ -212,6 +256,10 @@ function parseCurrentTeamEvent(event: TeamSessionEvent): TeamSessionEvent {
       return { ...event, data: parsePersisted(event.type, teamMessageQueuedEventSchema, event.data) }
     case 'team/message/delivered':
       return { ...event, data: parsePersisted(event.type, teamMessageDeliveredEventSchema, event.data) }
+    case 'team/project':
+      return { ...event, data: parsePersisted(event.type, teamProjectEventSchema, event.data) }
+    case 'team/member-usage':
+      return { ...event, data: parsePersisted(event.type, teamMemberUsageEventSchema, event.data) }
     /* v8 ignore next 2 -- TeamEventType is closed and every member is handled above. */
     default:
       return event
@@ -297,6 +345,29 @@ function applyCurrentTeamEvent(state: TeamState, event: TeamSessionEvent): void 
       state.delivered.push(event.data.messageId)
       break
     }
+    case 'team/project': {
+      const project = event.data.project
+      const prior = state.project
+      if (prior === undefined && project.revision !== 1) {
+        throw new Error('team project must begin at revision 1')
+      }
+      if (prior !== undefined && project.revision !== prior.revision + 1) {
+        throw new Error('team project revision is not contiguous')
+      }
+      state.project = project
+      break
+    }
+    case 'team/member-usage': {
+      const usage = event.data.usage
+      const index = state.memberUsage.findIndex(candidate => candidate.memberId === usage.memberId)
+      const prior = state.memberUsage[index]
+      if (prior !== undefined && usage.totalTokens < prior.totalTokens) {
+        throw new Error(`team member "${usage.memberId}" usage decreased`)
+      }
+      if (index < 0) state.memberUsage.push(usage)
+      else state.memberUsage[index] = usage
+      break
+    }
     /* v8 ignore next 2 -- TeamEventType is closed and every member is handled above. */
     default:
       return
@@ -306,7 +377,7 @@ function applyCurrentTeamEvent(state: TeamState, event: TeamSessionEvent): void 
 /** Host-only Team projection selected by the projected Session identity. */
 export const teamProjectionDefinition = {
   key: 'agentTeam',
-  stateVersion: 3,
+  stateVersion: 4,
   stateSchema: teamProjectionEntrySchema,
   init: header => emptyTeamState(header.id),
   apply: (state, event) => {

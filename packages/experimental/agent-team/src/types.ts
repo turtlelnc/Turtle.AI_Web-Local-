@@ -100,7 +100,67 @@ export interface TeamTaskView {
 export interface TeamView {
   readonly members: TeamMemberView[]
   readonly tasks: TeamTaskView[]
+  readonly project?: TeamProjectView
 }
+
+/** Built-in project working modes exposed by the Team runtime. */
+export type TeamProjectPresetId = 'new-product' | 'improve-existing' | 'fix-problem' | 'freeform'
+
+/** One durable project-level token guard. */
+export interface TeamTokenBudget {
+  readonly limitTokens: number
+  readonly warnAtRemainingTokens: number
+}
+
+/** Whole project configuration stored in the Team Lead Session. */
+export interface TeamProjectSnapshot {
+  readonly revision: number
+  readonly name: string
+  readonly presetId: TeamProjectPresetId
+  readonly presetRevision: 'builtin-1'
+  readonly tokenBudget?: TeamTokenBudget
+  readonly phase: 'active' | 'paused'
+  readonly pauseReason?: 'token-budget' | 'provider-limit'
+  readonly provider?: string
+}
+
+/** Latest exact provider-reported cumulative usage for one Team member. */
+export interface TeamMemberUsageSnapshot {
+  readonly memberId: SessionId
+  readonly totalTokens: number
+}
+
+/** User-facing project state and honest budget signal. */
+export interface TeamProjectView {
+  readonly revision: number
+  readonly name: string
+  readonly presetId: TeamProjectPresetId
+  readonly presetRevision: 'builtin-1'
+  readonly phase: 'active' | 'paused'
+  readonly budget: {
+    readonly status: 'unconfigured' | 'healthy' | 'warning' | 'paused'
+    readonly accuracy: 'provider-reported-usage' | 'provider-limit-signal'
+    readonly usedTokens: number
+    readonly limitTokens?: number
+    readonly remainingTokens?: number
+    readonly warnAtRemainingTokens?: number
+    readonly pauseReason?: 'token-budget' | 'provider-limit'
+    readonly provider?: string
+  }
+}
+
+/** Lead-only project setup or budget update. */
+export interface ConfigureTeamProjectRequest {
+  readonly name: string
+  readonly presetId: TeamProjectPresetId
+  readonly limitTokens?: number
+  readonly warnAtRemainingTokens?: number
+}
+
+/** Browser project mutation result with Team rejections preserved as values. */
+export type TeamProjectMutationResult =
+  | { readonly ok: true; readonly value: TeamProjectView }
+  | { readonly ok: false; readonly error: { readonly code: 'team-rejected'; readonly message: string } }
 
 /** One peer message retained until its target Session records it. */
 export interface TeamMessageSnapshot {
@@ -230,5 +290,9 @@ declare module '@deepseek-ai/dsh-session/types' {
       messageId: TeamMessageId
       targetId: SessionId
     }
+    /** Whole project configuration, stored only in the Team Lead Session. */
+    'team/project': { version: 2; teamId: TeamId; project: TeamProjectSnapshot }
+    /** Latest cumulative provider-reported usage for one member. */
+    'team/member-usage': { version: 2; teamId: TeamId; usage: TeamMemberUsageSnapshot }
   }
 }

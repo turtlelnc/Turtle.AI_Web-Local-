@@ -2,7 +2,11 @@
 
 export type {
   CreateTeamTaskRequest,
+  ConfigureTeamProjectRequest,
   TeamMemberView,
+  TeamProjectMutationResult,
+  TeamProjectPresetId,
+  TeamProjectView,
   TeamTaskAction,
   TeamTaskId,
   TeamTaskMutationResult,

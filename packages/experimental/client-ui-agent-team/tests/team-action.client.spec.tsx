@@ -84,6 +84,20 @@ function actions(overrides: Partial<TeamActionInjected> = {}): TeamActionInjecte
       ok: true,
       value: { ok: true, value: { ...task, revision: 2 } },
     }),
+    configureProject: () => Promise.resolve({
+      ok: true,
+      value: {
+        ok: true,
+        value: {
+          revision: 1,
+          name: 'Harness fusion',
+          presetId: 'improve-existing',
+          presetRevision: 'builtin-1',
+          phase: 'active',
+          budget: { status: 'healthy', accuracy: 'provider-reported-usage', usedTokens: 0 },
+        },
+      },
+    }),
     openTeammate: () => Promise.resolve(),
     ...overrides,
   }
@@ -133,6 +147,48 @@ describe('TeamAction', () => {
     expect(screen.getByText('write scopes overlap with task-2')).toBeTruthy()
     fireEvent.click(worker)
     await waitFor(() => { expect(openTeammate).toHaveBeenCalledWith(SESSION, view.members[1]) })
+  })
+
+  it('configures a project preset and token guard from the overview', async () => {
+    const configured = {
+      revision: 1,
+      name: 'Harness fusion',
+      presetId: 'improve-existing' as const,
+      presetRevision: 'builtin-1' as const,
+      phase: 'active' as const,
+      budget: {
+        status: 'healthy' as const,
+        accuracy: 'provider-reported-usage' as const,
+        usedTokens: 2_000,
+        limitTokens: 10_000,
+        remainingTokens: 8_000,
+        warnAtRemainingTokens: 1_000,
+      },
+    }
+    const configureProject = vi.fn(() => Promise.resolve({
+      ok: true as const,
+      value: { ok: true as const, value: configured },
+    }))
+    const load = vi.fn()
+      .mockResolvedValueOnce({ ok: true, value: view })
+      .mockResolvedValueOnce({ ok: true, value: { ...view, project: configured } })
+    render(<TeamAction {...props(actions({ load, configureProject }))} />)
+    fireEvent.click(screen.getByRole('button', { name: /Agent Team/u }))
+    await screen.findByText(zh['project.empty'])
+    fireEvent.click(screen.getByRole('button', { name: zh['project.setup'] }))
+    fireEvent.change(screen.getByPlaceholderText(zh['project.name']), { target: { value: 'Harness fusion' } })
+    fireEvent.change(screen.getByPlaceholderText(zh['budget.limit']), { target: { value: '10000' } })
+    fireEvent.change(screen.getByPlaceholderText(zh['budget.warningLevel']), { target: { value: '1000' } })
+    fireEvent.click(screen.getByRole('button', { name: zh.save }))
+    await waitFor(() => {
+      expect(configureProject).toHaveBeenCalledWith(SESSION, {
+        name: 'Harness fusion',
+        presetId: 'improve-existing',
+        limitTokens: 10_000,
+        warnAtRemainingTokens: 1_000,
+      })
+    })
+    expect(await screen.findByText(/2,000 Token 已使用 \/ 10,000/u)).toBeTruthy()
   })
 
   it('keeps only the newest overlapping refresh for one session', async () => {

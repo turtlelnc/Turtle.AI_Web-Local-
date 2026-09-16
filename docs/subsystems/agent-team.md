@@ -73,9 +73,29 @@ interface TeamTaskSnapshot {
 
 `pending` is unstarted or released, `in_progress` carries an owner, `completed` satisfies blockers, and `deleted` is a retained tombstone. Views add owner name, readiness, and write-scope overlap warnings without changing the durable snapshot.
 
+## Project control
+
+The Lead selects one revisioned built-in work preset and may configure a Team-wide token limit with a remaining-token warning threshold. `team/project` stores the complete current configuration; reaching the local limit or receiving an explicit provider exhaustion signal appends a paused revision. Raising or removing the limit through project configuration appends a new active revision.
+
+```ts type-equiv
+/** Whole project configuration stored in the Team Lead Session. */
+interface TeamProjectSnapshot {
+  readonly revision: number
+  readonly name: string
+  readonly presetId: TeamProjectPresetId
+  readonly presetRevision: 'builtin-1'
+  readonly tokenBudget?: TeamTokenBudget
+  readonly phase: 'active' | 'paused'
+  readonly pauseReason?: 'token-budget' | 'provider-limit'
+  readonly provider?: string
+}
+```
+
+`team/member-usage` stores the latest cumulative provider-reported token total per member. The aggregate is a local usage guard, not an account balance or a prediction of unpublished ChatGPT/Codex limits. Project and usage records are log-only; the tool adapter turns only the selected preset into model-visible policy.
+
 ## Replay
 
-`foldTeam()` replays one root Session into the roster, task board, and queued-minus-delivered mailbox that every Team operation reads. It selects records by `TeamId`, so events inherited by an ordinary fork retain the ancestor id and never enter the new root's state. Session event `seq` and `time` remain the ordering and timing record; Team snapshots do not duplicate them. Roster and task reads reach callers as views; pending mail stays internal to delivery and recovery. The package [README](../../packages/experimental/agent-team/README.md) owns operation, authorization, recovery, and limit behavior.
+`foldTeam()` replays one root Session into the roster, project, member usage, task board, and queued-minus-delivered mailbox that every Team operation reads. It selects records by `TeamId`, so events inherited by an ordinary fork retain the ancestor id and never enter the new root's state. Session event `seq` and `time` remain the ordering and timing record; Team snapshots do not duplicate them. Roster, project, and task reads reach callers as views; pending mail stays internal to delivery and recovery. The package [README](../../packages/experimental/agent-team/README.md) owns operation, authorization, recovery, and limit behavior.
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -178,11 +198,26 @@ interrupt(caller: Agent, targetName: string): { previousStatus: 'running' | 'idl
 tryMembership(agent: Agent): TeamMembership | undefined
 
 /**
+ * Return the logged project preset instruction visible to one Team member.
+ * @param agent - exact live Team member.
+ * @returns model-visible working instruction, or undefined before project configuration.
+ */
+projectInstruction(agent: Agent): string | undefined
+
+/**
  * Read the current roster and non-deleted task board through the generated Remote API.
  * @param agent - exact live Team member used as the authority credential.
  * @returns detached current roster and task views.
  */
 @Remote('view') remoteView(agent: Agent): TeamView
+
+/**
+ * Configure one durable project preset and optional local token guard.
+ * @param agent - exact live Lead Agent used as the authority credential.
+ * @param request - project name, built-in preset, and optional local token thresholds.
+ * @returns committed project view or a typed Team rejection.
+ */
+@Remote('configureProject') async remoteConfigureProject( agent: Agent, request: ConfigureTeamProjectRequest, ): Promise<TeamProjectMutationResult>
 
 /**
  * Create one shared task through the generated Remote API.

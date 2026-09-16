@@ -10,6 +10,7 @@ import { errorMessage, TeamError } from './error.ts'
 import { TeamJournal } from './journal.ts'
 import { TeamRuntimeLifecycle } from './lifecycle.ts'
 import { TeamMailbox } from './mailbox.ts'
+import { TeamProjectControl } from './project.ts'
 import { teamProjectionDefinition } from './projection.ts'
 import { TeamRoster } from './roster.ts'
 import type { TeamMembership } from './roster.ts'
@@ -17,12 +18,14 @@ import { TeamTaskBoard } from './task-board.ts'
 import { TeamId, TeamTaskId } from './types.ts'
 import type {
   Config,
+  ConfigureTeamProjectRequest,
   CreateTeamTaskRequest,
   SendTeamMessageRequest,
   SendTeamMessageResult,
   SpawnTeammateRequest,
   SpawnTeammateResult,
   TeamMemberView,
+  TeamProjectMutationResult,
   TeamTaskMutationResult,
   TeamTaskView,
   TeamView,
@@ -57,7 +60,7 @@ function positiveLimit(name: string, value: number): number {
 
 /** Agent Teams service backed by the exact live Lead Session log. */
 export class TeamService extends TypertRemoteService {
-  static inject = ['agents', 'sessions', 'sessionPersistence', 'sessionProjections', 'subagents']
+  static inject = ['agents', 'sessions', 'sessionPersistence', 'sessionProjections', 'subagents', 'tokenMeter']
 
   static Config: z<Config> = z.object({
     maxMembers: z.number().step(1).min(1).default(DEFAULT_MAX_MEMBERS),
@@ -75,6 +78,7 @@ export class TeamService extends TypertRemoteService {
   private readonly journal: TeamJournal
   private readonly roster: TeamRoster
   private readonly mailbox: TeamMailbox
+  private readonly project: TeamProjectControl
   private readonly tasks: TeamTaskBoard
 
   constructor(ctx: Context, config: Config = {}) {
@@ -97,6 +101,7 @@ export class TeamService extends TypertRemoteService {
     this.lifecycle = new TeamRuntimeLifecycle(this.config.disposalTimeoutMs)
     this.journal = new TeamJournal(ctx, (root) => { this.activity.notify(TeamId(root.id)) })
     this.roster = new TeamRoster(ctx, this.journal, this.lifecycle, this.config.maxMembers)
+    this.project = new TeamProjectControl(ctx, this.journal, this.roster)
     this.mailbox = new TeamMailbox(
       ctx,
       this.journal,
@@ -107,7 +112,23 @@ export class TeamService extends TypertRemoteService {
     )
     this.tasks = new TeamTaskBoard(this.journal, this.config.maxTasks)
 
-    ctx.on('session/event', (session, event) => { this.mailbox.observeSessionEvent(session, event) })
+    ctx.on('session/event', (session, event) => {
+      this.mailbox.observeSessionEvent(session, event)
+      if (event.type !== 'assistant/message' && event.type !== 'assistant/attempt') return
+      const agent = ctx.agents.get(session.id)
+      if (agent === undefined) return
+      void this.project.recordUsage(agent).catch((error: unknown) => {
+        this.ctx.logger.warn(`Agent Teams budget usage update failed: ${errorMessage(error)}`)
+      })
+    })
+    ctx.on('agent/request', async ({ agent }, next) => {
+      await this.project.assertRequestAllowed(agent)
+      return await next()
+    })
+    ctx.on('agent/request-error', async ({ agent, provider, failure }, next) => {
+      if (!this.project.isProviderLimit(failure.code, failure.status)) return await next()
+      return await this.project.pauseForProviderLimit(agent, provider) ? undefined : await next()
+    })
     ctx.on('agent/session-start', ({ agent }) => { this.scheduleRecovery(agent) })
     ctx.on('agent/status', ({ agent }) => {
       const membership = this.roster.tryMembership(agent)
@@ -235,15 +256,46 @@ export class TeamService extends TypertRemoteService {
   }
 
   /**
+   * Return the logged project preset instruction visible to one Team member.
+   * @param agent - exact live Team member.
+   * @returns model-visible working instruction, or undefined before project configuration.
+   */
+  projectInstruction(agent: Agent): string | undefined {
+    return this.project.instruction(agent)
+  }
+
+  /**
    * Read the current roster and non-deleted task board through the generated Remote API.
    * @param agent - exact live Team member used as the authority credential.
    * @returns detached current roster and task views.
    */
   @Remote('view')
   remoteView(agent: Agent): TeamView {
+    const membership = this.roster.membership(agent)
+    const project = this.project.view(membership)
     return {
-      members: this.listMembers(agent),
-      tasks: this.listTasks(agent),
+      members: this.roster.list(membership),
+      tasks: this.tasks.list(membership),
+      ...project === undefined ? {} : { project },
+    }
+  }
+
+  /**
+   * Configure one durable project preset and optional local token guard.
+   * @param agent - exact live Lead Agent used as the authority credential.
+   * @param request - project name, built-in preset, and optional local token thresholds.
+   * @returns committed project view or a typed Team rejection.
+   */
+  @Remote('configureProject')
+  async remoteConfigureProject(
+    agent: Agent,
+    request: ConfigureTeamProjectRequest,
+  ): Promise<TeamProjectMutationResult> {
+    try {
+      return { ok: true, value: await this.project.configure(agent, request) }
+    } catch (error: unknown) {
+      if (!(error instanceof TeamError)) throw error
+      return { ok: false, error: { code: 'team-rejected', message: error.message } }
     }
   }
 

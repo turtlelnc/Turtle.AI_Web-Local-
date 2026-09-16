@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'reac
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {
   TeamMemberView as TeamRosterMember,
+  TeamProjectMutationResult,
+  TeamProjectPresetId,
   TeamTaskAction,
   TeamTaskId,
   TeamTaskMutationResult,
@@ -23,6 +25,8 @@ export type TeamActionResult<T> = RemoteResult<T>
 
 /** Generated Remote result whose business value preserves Team task rejections. */
 export type TeamTaskActionResult = RemoteResult<TeamTaskMutationResult>
+/** Generated Remote project mutation with Team rejections preserved. */
+export type TeamProjectActionResult = RemoteResult<TeamProjectMutationResult>
 
 /** Business actions injected by the browser plugin. */
 export interface TeamActionInjected {
@@ -43,6 +47,12 @@ export interface TeamActionInjected {
     writeScopes?: string[]
     owner?: string
   }) => Promise<TeamTaskActionResult>
+  configureProject: (sessionId: SessionId, input: {
+    name: string
+    presetId: TeamProjectPresetId
+    limitTokens?: number
+    warnAtRemainingTokens?: number
+  }) => Promise<TeamProjectActionResult>
   openTeammate: (sessionId: SessionId, member: TeamRosterMember) => Promise<void>
 }
 
@@ -57,7 +67,17 @@ interface Draft {
   scopes: string
 }
 
+interface ProjectDraft {
+  name: string
+  presetId: TeamProjectPresetId
+  limitTokens: string
+  warnAtRemainingTokens: string
+}
+
 const EMPTY_DRAFT: Draft = { subject: '', description: '', blockers: '', scopes: '' }
+const EMPTY_PROJECT: ProjectDraft = {
+  name: '', presetId: 'improve-existing', limitTokens: '', warnAtRemainingTokens: '',
+}
 
 function items(value: string): string[] {
   return [...new Set(value.split(',').map(item => item.trim()).filter(Boolean))]
@@ -97,7 +117,7 @@ function memberStatusKey(status: TeamRosterMember['status']): TeamKey {
 
 /** Render the live Team roster and compare-and-set task board. */
 export function TeamAction({
-  sessionId, load, createTask, updateTask, openTeammate, t,
+  sessionId, load, createTask, updateTask, configureProject, openTeammate, t,
 }: TeamActionProps) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -108,6 +128,9 @@ export function TeamAction({
   const [editing, setEditing] = useState<string | null>(null)
   const [editDraft, setEditDraft] = useState<Draft>(EMPTY_DRAFT)
   const [pendingTasks, setPendingTasks] = useState<ReadonlySet<string>>(() => new Set())
+  const [configuringProject, setConfiguringProject] = useState(false)
+  const [projectPending, setProjectPending] = useState(false)
+  const [projectDraft, setProjectDraft] = useState<ProjectDraft>(EMPTY_PROJECT)
   const sessionRef = useRef(sessionId)
   const refreshGeneration = useRef(0)
   sessionRef.current = sessionId
@@ -123,6 +146,9 @@ export function TeamAction({
     setEditing(null)
     setEditDraft(EMPTY_DRAFT)
     setPendingTasks(new Set())
+    setConfiguringProject(false)
+    setProjectPending(false)
+    setProjectDraft(EMPTY_PROJECT)
   }, [sessionId])
 
   const refresh = useCallback(async (): Promise<boolean> => {
@@ -203,6 +229,48 @@ export function TeamAction({
     setCreating(false)
   }
 
+  const startProjectEdit = (): void => {
+    const project = view?.project
+    setProjectDraft(project === undefined ? EMPTY_PROJECT : {
+      name: project.name,
+      presetId: project.presetId,
+      limitTokens: project.budget.limitTokens?.toString() ?? '',
+      warnAtRemainingTokens: project.budget.warnAtRemainingTokens?.toString() ?? '',
+    })
+    setConfiguringProject(true)
+  }
+
+  const submitProject = async (): Promise<void> => {
+    const requestedSession = sessionId
+    const name = projectDraft.name.trim()
+    /* v8 ignore next -- the form disables Save for an empty project name. */
+    if (name === '') return
+    const limitTokens = projectDraft.limitTokens === '' ? undefined : Number(projectDraft.limitTokens)
+    const warnAtRemainingTokens = projectDraft.warnAtRemainingTokens === ''
+      ? undefined
+      : Number(projectDraft.warnAtRemainingTokens)
+    setProjectPending(true)
+    invalidateRefresh()
+    try {
+      const result = await configureProject(requestedSession, {
+        name,
+        presetId: projectDraft.presetId,
+        ...limitTokens === undefined ? {} : { limitTokens },
+        ...warnAtRemainingTokens === undefined ? {} : { warnAtRemainingTokens },
+      })
+      if (sessionRef.current !== requestedSession) return
+      if (!result.ok) setError(failureText(result.error))
+      else if (!result.value.ok) setError(failureText(result.value.error))
+      else {
+        setError(null)
+        setConfiguringProject(false)
+        await refresh()
+      }
+    } finally {
+      if (sessionRef.current === requestedSession) setProjectPending(false)
+    }
+  }
+
   const startEdit = (task: TeamTask): void => {
     setEditing(task.id)
     setEditDraft({
@@ -249,7 +317,9 @@ export function TeamAction({
   const nextTask = view?.tasks.find(task => (
     task.status === 'pending' && task.ready && task.id !== activeTask?.id
   ))
-  const needsReview = error !== null || view?.members.some(member => member.status === 'failed') === true
+  const budgetNeedsReview = view?.project?.budget.status === 'warning' || view?.project?.budget.status === 'paused'
+  const needsReview = error !== null || budgetNeedsReview
+    || view?.members.some(member => member.status === 'failed') === true
 
   return (
     <div className={css.root} data-team-action>
@@ -309,6 +379,72 @@ export function TeamAction({
                     <strong>{activeMembers}</strong>
                   </span>
                 </div>
+              </section>
+              <section>
+                <div className={css.sectionTitle}>
+                  <h3>{t('project.title')}</h3>
+                  <button type="button" className={css.smallButton} onClick={startProjectEdit}>
+                    <IconEditOutline16 size={13} /> {view.project === undefined ? t('project.setup') : t('project.edit')}
+                  </button>
+                </div>
+                {configuringProject && (
+                  <div className={css.form}>
+                    <input
+                      value={projectDraft.name}
+                      placeholder={t('project.name')}
+                      onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                        setProjectDraft({ ...projectDraft, name: event.target.value })
+                      }}
+                    />
+                    <select
+                      value={projectDraft.presetId}
+                      onChange={(event: ChangeEvent<HTMLSelectElement>) => {
+                        setProjectDraft({ ...projectDraft, presetId: event.target.value as TeamProjectPresetId })
+                      }}
+                    >
+                      <option value="new-product">{t('preset.new-product')}</option>
+                      <option value="improve-existing">{t('preset.improve-existing')}</option>
+                      <option value="fix-problem">{t('preset.fix-problem')}</option>
+                      <option value="freeform">{t('preset.freeform')}</option>
+                    </select>
+                    <input
+                      type="number"
+                      min="1"
+                      value={projectDraft.limitTokens}
+                      placeholder={t('budget.limit')}
+                      onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                        setProjectDraft({ ...projectDraft, limitTokens: event.target.value })
+                      }}
+                    />
+                    <input
+                      type="number"
+                      min="0"
+                      value={projectDraft.warnAtRemainingTokens}
+                      placeholder={t('budget.warningLevel')}
+                      onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                        setProjectDraft({ ...projectDraft, warnAtRemainingTokens: event.target.value })
+                      }}
+                    />
+                    <small className={css.help}>{t('budget.help')}</small>
+                    <div className={css.formActions}>
+                      <button type="button" disabled={projectPending || projectDraft.name.trim() === ''} onClick={() => { void submitProject() }}>{t('save')}</button>
+                      <button type="button" disabled={projectPending} onClick={() => { setConfiguringProject(false) }}>{t('cancel')}</button>
+                    </div>
+                  </div>
+                )}
+                {view.project === undefined
+                  ? !configuringProject && <div className={css.notice}>{t('project.empty')}</div>
+                  : (
+                    <div className={css.projectCard}>
+                      <strong>{view.project.name}</strong>
+                      <span>{t(`preset.${view.project.presetId}`)}</span>
+                      <span className={view.project.budget.status === 'paused' ? css.warning : undefined}>
+                        {t(`budget.${view.project.budget.status}`)} · {view.project.budget.usedTokens.toLocaleString()} {t('budget.tokens')}
+                        {view.project.budget.limitTokens === undefined ? '' : ` / ${view.project.budget.limitTokens.toLocaleString()}`}
+                      </span>
+                      <small>{view.project.budget.accuracy === 'provider-limit-signal' ? t('budget.providerSignal') : t('budget.reportedUsage')}</small>
+                    </div>
+                  )}
               </section>
               <section>
                 <h3>{t('roster')}</h3>

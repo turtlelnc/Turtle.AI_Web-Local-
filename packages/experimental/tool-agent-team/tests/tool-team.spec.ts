@@ -7,6 +7,7 @@ import type { Agent } from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
+import TokenMeter from '@deepseek-ai/dsh-token-meter'
 import { scopeOf } from '@deepseek-ai/dsh-scope'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
@@ -56,6 +57,7 @@ afterEach(() => {
 async function setup(script: ConstructorParameters<typeof MockAdapter>[0], legacyControl = false) {
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
+  await ctx.plugin(TokenMeter)
   const storageRoot = mkdtempSync(join(tmpdir(), 'dsh-tool-team-'))
   roots.push(storageRoot)
   await ctx.plugin(JsonlSessionPersistence, { root: storageRoot })
@@ -131,8 +133,10 @@ describe('dsh-tool-team', () => {
       .toEqual(TOOL_NAMES)
     const leadPrompt = renderPrompt(leadAssembly)
     expect(leadPrompt).toContain('create teammates only when the user explicitly asks')
-    expect(leadPrompt).toContain('time-boxed product discovery')
+    expect(leadPrompt).toContain('time-boxed discovery pass')
     expect(leadPrompt).toContain('use spawn_user_tester')
+    expect(leadPrompt).toContain('An Explorer gathers evidence')
+    expect(leadPrompt).toContain('prompt guidance, not a security boundary')
     expect(leadPrompt).toContain('FS_STALE_VERSION')
     expect(leadPrompt).toContain('Bash, formatters, code generators, and scripts are not fully protected')
     expect(leadPrompt).toContain('Task readiness never starts an owner')
@@ -163,6 +167,29 @@ describe('dsh-tool-team', () => {
     expect(denied.isError).toBe(true)
     expect(text(denied)).toContain('only the Team Lead')
     await execute(ctx, lead, 'interrupt_agent', { target: 'tool-worker' })
+    await vi.waitFor(() => { expect(ctx.agents.get(childId)).toBeUndefined() }, { timeout: 5_000 })
+  })
+
+  it('prefixes an optional teammate role without changing the delegated task', async () => {
+    const { ctx, lead } = await setup(['hang'])
+    const spawned = await execute(ctx, lead, 'spawn_teammate', {
+      name: 'evidence-scout',
+      description: 'inspect compatibility evidence',
+      prompt: 'Determine whether the selected runtime supports the target OS.',
+      role: 'explorer',
+    })
+    expect(spawned.isError).toBe(false)
+    const childId = spawnedChildId(spawned)
+    const child = await waitRunning(ctx, childId)
+    const initialPrompt = child.session.snapshotEvents().find(event => event.type === 'user/message'
+      && event.data.source.kind === 'user')
+    const prompt = initialPrompt?.type === 'user/message'
+      ? initialPrompt.data.content.flatMap(block => block.type === 'text' ? [block.text] : []).join('')
+      : ''
+    expect(prompt).toContain('ROLE: Explorer')
+    expect(prompt).toContain('Do not modify files or external state')
+    expect(prompt).toContain('TASK:\nDetermine whether the selected runtime supports the target OS.')
+    await execute(ctx, lead, 'interrupt_agent', { target: 'evidence-scout' })
     await vi.waitFor(() => { expect(ctx.agents.get(childId)).toBeUndefined() }, { timeout: 5_000 })
   })
 

@@ -30,15 +30,32 @@ export const Config: z<Config> = z.object({
 /** Model-facing collaboration guidance shared by Lead and teammates. */
 const POLICY = `Agent Teams is available in this session, but create teammates only when the user explicitly asks to use Agent Teams or teammates.
 
-For a real product project, begin with a time-boxed product discovery pass before substantial implementation unless the user explicitly asks for direct execution. Identify the user problem, target users, current alternatives, evidence, assumptions, differentiators, feasibility risks, the smallest useful release, and measurable success criteria. Treat product claims as hypotheses until evidence supports them.
+For unfamiliar product work, use a time-boxed discovery pass only while it reduces a decision-relevant uncertainty. Inspect the request, repository, existing product behavior, project instructions, user workflow, alternatives, and constraints before asking questions. Identify the user problem, target users, evidence, assumptions, differentiators, feasibility risks, smallest useful release, and measurable success criteria. Distinguish verified facts, user-stated constraints, inferences, assumptions, and unknowns. Proceed with a small reversible milestone when unresolved questions do not make the work unsafe or likely to be discarded; do not require formal approval when the user already authorized implementation.
 
 After an interactive milestone exists, use spawn_user_tester when an independent first-time-user evaluation can change a product decision. The tester receives a fresh conversation and only the application entry supplied to the tool. Do not send it project goals, source explanations, intended workflows, prior findings, or a preferred verdict. Preserve its report before interpreting it; repeated observations matter more than a single suggested solution.
 
 The Team Lead and all teammates share the same working directory and filesystem. Edits are immediately visible to every member. Split write work into disjoint scopes, record expected write scopes on shared tasks, and use task dependencies when work must be ordered. Write-scope overlap is advisory, not a lock.
 
+Use the smallest team that creates independent value. The Lead owns synthesis and user-facing decisions. An Explorer gathers evidence and must not modify files or external state. A Builder owns one explicit implementation scope and its focused verification. A Reviewer independently inspects evidence and reports prioritized findings without editing. These role presets are prompt guidance, not a security boundary. Use spawn_user_tester instead of a generic role for neutral first-time-user evaluation. Use a one-shot model-selectable subagent, when available, for a premium specialist decision that does not need durable Team state.
+
 Prefer read/edit/write for file changes. If a file operation returns FS_STALE_VERSION, read the current file, rebase your intended change onto the new content, and retry. Bash, formatters, code generators, and scripts are not fully protected by the filesystem version guard; coordinate them explicitly and have the Lead review the final diff and run tests.
 
 send_message steers a running target at its nearest step boundary, starts an idle target, and cold-resumes an inactive teammate. A delivered peer item starts with its stable message id and sender name. A successful send is already durable even when its result says queued; do not resend it. Shared-task workflow is list, get, claim with the current revision, perform the work, then complete. Task readiness never starts an owner. Before wait_agent, use list_agents and make sure another required member is running or provisioning; use send_message first when the required member is inactive. wait_agent observes only changes after that call starts, never wakes a member, and returns noProgress immediately when no other member can produce a change. Re-list after wakeup or timeout. The Lead must wait for required teammates before giving the final answer.`
+
+const HANDOFF = 'Every teammate handoff must use this order: Outcome; Evidence; Files or artifacts changed; Verification performed; Risks or unresolved questions; Recommended next action. State \'none\' for an empty section. Separate observed facts from inferences, include exact paths or identifiers when relevant, and never claim completion without verification. The receiver must acknowledge unresolved risks before building on the handoff.'
+
+type TeammateRole = 'explorer' | 'builder' | 'reviewer'
+
+const TEAMMATE_ROLE_PROMPTS: Readonly<Record<TeammateRole, string>> = {
+  explorer: 'ROLE: Explorer. Gather decision-relevant evidence only. Inspect before asking, distinguish facts, user-stated constraints, inferences, assumptions, and unknowns, and report sources or reproducible observations. Do not modify files or external state. Stop when the delegated question is answered or the next missing fact requires authority you do not have.',
+  builder: 'ROLE: Builder. Own only the delegated implementation and write scope. Inspect the existing architecture before editing, preserve unrelated work, implement the smallest coherent change, and run focused verification. Fix regressions introduced by your work when the fix remains in scope.',
+  reviewer: 'ROLE: Reviewer. Independently inspect the delegated artifact, evidence, and verification. Do not modify files or external state. Report actionable findings in priority order, distinguish defects from optional improvements, and state when no material issue is found.',
+}
+
+/** Prefix one delegated task with a stable, bounded role contract. */
+function teammatePrompt(role: TeammateRole | undefined, prompt: string): string {
+  return role === undefined ? prompt : `${TEAMMATE_ROLE_PROMPTS[role]}\n\nTASK:\n${prompt}`
+}
 
 const ACTIVE_WAIT_STATUSES: ReadonlySet<TeamMemberView['status']> = new Set(['running', 'provisioning'])
 const NO_ACTIVE_PEER_MESSAGE = 'No other Team member is running or provisioning. wait_agent cannot make progress or wake inactive teammates. Re-list with list_agents and team_task_list, then use send_message to wake each required inactive teammate before waiting again.'
@@ -189,7 +206,8 @@ function install(agent: Agent, ctx: Context, config: Required<Config>): () => vo
       order: scoped.systemPrompt.getSectionOrder('TEAM_POLICY'),
       text: () => {
         const membership = ctx.agentTeams.membership(agent)
-        return `${POLICY}\n\nYour Team role is ${membership.role}; your Team name is ${membership.name}; Team id is ${membership.id}.`
+        const project = ctx.agentTeams.projectInstruction(agent)
+        return `${POLICY}\n\n${HANDOFF}\n\nYour Team role is ${membership.role}; your Team name is ${membership.name}; Team id is ${membership.id}.${project === undefined ? '' : `\n\n${project}`}`
       },
     }))
 
@@ -200,6 +218,11 @@ function install(agent: Agent, ctx: Context, config: Required<Config>): () => vo
         name: { type: 'string', required: true, description: 'Unique lower-kebab-case teammate name.' },
         description: { type: 'string', required: true, description: 'Short description of the delegated responsibility.' },
         prompt: { type: 'string', required: true, description: 'Complete initial task for the teammate.' },
+        role: {
+          type: 'string',
+          enum: ['explorer', 'builder', 'reviewer'],
+          description: 'Optional prompt-level role preset. Explorer and reviewer are instructed to remain read-only; this is guidance, not confinement.',
+        },
         context: {
           type: 'string',
           enum: ['fresh', 'fork'],
@@ -213,7 +236,7 @@ function install(agent: Agent, ctx: Context, config: Required<Config>): () => vo
         return await ctx.agentTeams.spawnTeammate(agent, {
           name: args.name,
           description: args.description,
-          prompt: [{ type: 'text', text: args.prompt }],
+          prompt: [{ type: 'text', text: teammatePrompt(args.role, args.prompt) }],
           context,
           provider: context === 'fork' ? config.forkProvider : config.freshProvider,
           signal: exec.signal,

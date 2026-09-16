@@ -43,6 +43,7 @@ function pending(state: TeamState): TeamMessageSnapshot[] {
 function isEmptyState(state: TeamState): boolean {
   return state.members.length === 0 && state.tasks.length === 0
     && state.messages.length === 0 && state.delivered.length === 0
+    && state.project === undefined && state.memberUsage.length === 0
 }
 
 function member(overrides: Partial<TeamMemberSnapshot> = {}): TeamMemberSnapshot {
@@ -149,6 +150,38 @@ describe('Agent Teams projection events', () => {
       teamId: TEAM,
       task: task({ revision: 3 }),
     }, SessionSeq(1))])).toThrow(/revision is not contiguous/)
+  })
+
+  it('projects project revisions and monotonic member usage', () => {
+    const project = {
+      revision: 1,
+      name: 'Harness fusion',
+      presetId: 'improve-existing' as const,
+      presetRevision: 'builtin-1' as const,
+      tokenBudget: { limitTokens: 10_000, warnAtRemainingTokens: 1_000 },
+      phase: 'active' as const,
+    }
+    const records: SessionEvent[] = [
+      event('team/project', { version: 2, teamId: TEAM, project }, SessionSeq(0)),
+      event('team/member-usage', {
+        version: 2, teamId: TEAM, usage: { memberId: ROOT, totalTokens: 100 },
+      }, SessionSeq(1)),
+      event('team/member-usage', {
+        version: 2, teamId: TEAM, usage: { memberId: ROOT, totalTokens: 250 },
+      }, SessionSeq(2)),
+    ]
+    const state = projectTeam(ROOT, records)
+    expect(state.project).toEqual(project)
+    expect(state.memberUsage).toEqual([{ memberId: ROOT, totalTokens: 250 }])
+    expect(() => projectTeam(ROOT, [event('team/project', {
+      version: 2, teamId: TEAM, project: { ...project, revision: 2 },
+    }, SessionSeq(0))])).toThrow(/must begin at revision 1/)
+    expect(() => projectTeam(ROOT, [records[0]!, event('team/project', {
+      version: 2, teamId: TEAM, project: { ...project, revision: 3 },
+    }, SessionSeq(1))])).toThrow(/revision is not contiguous/)
+    expect(() => projectTeam(ROOT, [records[1]!, event('team/member-usage', {
+      version: 2, teamId: TEAM, usage: { memberId: ROOT, totalTokens: 99 },
+    }, SessionSeq(2))])).toThrow(/usage decreased/)
   })
 
   it('rejects every invalid persisted task dependency relation', () => {

@@ -416,10 +416,22 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'Team membership, or undefined for non-Team subagents and stale identities.',
       },
       {
+        signature: 'projectInstruction(agent: Agent): string | undefined',
+        description: 'Return the logged project preset instruction visible to one Team member.',
+        parameters: [{ name: 'agent', description: 'exact live Team member.' }],
+        returns: 'model-visible working instruction, or undefined before project configuration.',
+      },
+      {
         signature: '@Remote(\'view\') remoteView(agent: Agent): TeamView',
         description: 'Read the current roster and non-deleted task board through the generated Remote API.',
         parameters: [{ name: 'agent', description: 'exact live Team member used as the authority credential.' }],
         returns: 'detached current roster and task views.',
+      },
+      {
+        signature: '@Remote(\'configureProject\') async remoteConfigureProject( agent: Agent, request: ConfigureTeamProjectRequest, ): Promise<TeamProjectMutationResult>',
+        description: 'Configure one durable project preset and optional local token guard.',
+        parameters: [{ name: 'agent', description: 'exact live Lead Agent used as the authority credential.' }, { name: 'request', description: 'project name, built-in preset, and optional local token thresholds.' }],
+        returns: 'committed project view or a typed Team rejection.',
       },
       {
         signature: '@Remote(\'createTask\') remoteCreateTask(agent: Agent, request: CreateTeamTaskRequest): Promise<TeamTaskMutationResult>',
@@ -4047,6 +4059,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type CompositionRowEnablement = boolean | \'conditional\';',
   },
   {
+    name: 'ConfigureTeamProjectRequest',
+    declaration: 'export interface ConfigureTeamProjectRequest {\n    readonly name: string;\n    readonly presetId: TeamProjectPresetId;\n    readonly limitTokens?: number;\n    readonly warnAtRemainingTokens?: number;\n}',
+  },
+  {
     name: 'ConfinedArgv',
     declaration: 'export interface ConfinedArgv {\n    argv: string[];\n    enforcement: SandboxEnforcement;\n    denialSignatures: readonly string[];\n    runnerFailureRules: readonly RunnerFailureRule[];\n}',
   },
@@ -5000,7 +5016,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'PromptProfileDefinition',
-    declaration: 'export interface PromptProfileDefinition {\n    readonly id: PromptProfileId;\n    readonly name: string;\n    readonly base: PromptProfileBase;\n    readonly additionalInstructions: string;\n    readonly behavior: PromptProfileBehavior;\n    readonly revision: PromptProfileRevision;\n    readonly builtIn: boolean;\n}',
+    declaration: 'export interface PromptProfileDefinition {\n    readonly id: PromptProfileId;\n    readonly name: string;\n    readonly base: PromptProfileBase;\n    readonly additionalInstructions: string;\n    readonly behavior: PromptProfileBehavior;\n    readonly revision: PromptProfileRevision;\n    readonly baseRevision?: PromptProfileRevision;\n    readonly builtIn: boolean;\n}',
   },
   {
     name: 'PromptProfileDraft',
@@ -6095,6 +6111,18 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type TeamMessageId = Branded<\'TeamMessageId\'>;',
   },
   {
+    name: 'TeamProjectMutationResult',
+    declaration: 'export type TeamProjectMutationResult = {\n    readonly ok: true;\n    readonly value: TeamProjectView;\n} | {\n    readonly ok: false;\n    readonly error: {\n        readonly code: \'team-rejected\';\n        readonly message: string;\n    };\n};',
+  },
+  {
+    name: 'TeamProjectPresetId',
+    declaration: 'export type TeamProjectPresetId = \'new-product\' | \'improve-existing\' | \'fix-problem\' | \'freeform\';',
+  },
+  {
+    name: 'TeamProjectView',
+    declaration: 'export interface TeamProjectView {\n    readonly revision: number;\n    readonly name: string;\n    readonly presetId: TeamProjectPresetId;\n    readonly presetRevision: \'builtin-1\';\n    readonly phase: \'active\' | \'paused\';\n    readonly budget: {\n        readonly status: \'unconfigured\' | \'healthy\' | \'warning\' | \'paused\';\n        readonly accuracy: \'provider-reported-usage\' | \'provider-limit-signal\';\n        readonly usedTokens: number;\n        readonly limitTokens?: number;\n        readonly remainingTokens?: number;\n        readonly warnAtRemainingTokens?: number;\n        readonly pauseReason?: \'token-budget\' | \'provider-limit\';\n        readonly provider?: string;\n    };\n}',
+  },
+  {
     name: 'TeamTaskAction',
     declaration: 'export type TeamTaskAction = \'claim\' | \'release\' | \'edit\' | \'set_dependencies\' | \'complete\' | \'reopen\' | \'reassign\' | \'delete\';',
   },
@@ -6116,7 +6144,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'TeamView',
-    declaration: 'export interface TeamView {\n    readonly members: TeamMemberView[];\n    readonly tasks: TeamTaskView[];\n}',
+    declaration: 'export interface TeamView {\n    readonly members: TeamMemberView[];\n    readonly tasks: TeamTaskView[];\n    readonly project?: TeamProjectView;\n}',
   },
   {
     name: 'TeamWaitResult',

@@ -334,6 +334,11 @@
     },
     {
       "doc": "docs/subsystems/agent-team.md",
+      "symbol": "TeamProjectSnapshot",
+      "source": "packages/experimental/agent-team/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/agent-team.md",
       "symbol": "TeamTaskSnapshot",
       "source": "packages/experimental/agent-team/src/types.ts"
     },

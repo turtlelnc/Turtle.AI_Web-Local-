@@ -829,7 +829,20 @@ Source: [`packages/subagent/tool-subagent/src/model-selection-state.ts:17`](../p
 
 Types: [TeamId](subsystems/agent-team.md) · [TeamMemberSnapshot](subsystems/agent-team.md)
 
-Source: [`packages/experimental/agent-team/src/types.ts:221`](../packages/experimental/agent-team/src/types.ts)
+Source: [`packages/experimental/agent-team/src/types.ts:281`](../packages/experimental/agent-team/src/types.ts)
+
+<a id="teammember-usage--log-only"></a>
+
+#### `team/member-usage` — log-only
+
+```ts persistence-catalog
+/** Latest cumulative provider-reported usage for one member. */
+'team/member-usage': { version: 2; teamId: TeamId; usage: TeamMemberUsageSnapshot }
+```
+
+Types: [TeamId](subsystems/agent-team.md) · [TeamMemberUsageSnapshot](subsystems/agent-team.md)
+
+Source: [`packages/experimental/agent-team/src/types.ts:296`](../packages/experimental/agent-team/src/types.ts)
 
 <a id="teammessagedelivered--log-only"></a>
 
@@ -847,7 +860,7 @@ Source: [`packages/experimental/agent-team/src/types.ts:221`](../packages/experi
 
 Types: [TeamId](subsystems/agent-team.md) · [TeamMessageId](subsystems/agent-team.md)
 
-Source: [`packages/experimental/agent-team/src/types.ts:227`](../packages/experimental/agent-team/src/types.ts)
+Source: [`packages/experimental/agent-team/src/types.ts:287`](../packages/experimental/agent-team/src/types.ts)
 
 <a id="teammessagequeued--log-only"></a>
 
@@ -860,7 +873,20 @@ Source: [`packages/experimental/agent-team/src/types.ts:227`](../packages/experi
 
 Types: [TeamId](subsystems/agent-team.md) · [TeamMessageSnapshot](subsystems/agent-team.md)
 
-Source: [`packages/experimental/agent-team/src/types.ts:225`](../packages/experimental/agent-team/src/types.ts)
+Source: [`packages/experimental/agent-team/src/types.ts:285`](../packages/experimental/agent-team/src/types.ts)
+
+<a id="teamproject--log-only"></a>
+
+#### `team/project` — log-only
+
+```ts persistence-catalog
+/** Whole project configuration, stored only in the Team Lead Session. */
+'team/project': { version: 2; teamId: TeamId; project: TeamProjectSnapshot }
+```
+
+Types: [TeamId](subsystems/agent-team.md) · [TeamProjectSnapshot](subsystems/agent-team.md)
+
+Source: [`packages/experimental/agent-team/src/types.ts:294`](../packages/experimental/agent-team/src/types.ts)
 
 <a id="teamtask--log-only"></a>
 
@@ -873,7 +899,7 @@ Source: [`packages/experimental/agent-team/src/types.ts:225`](../packages/experi
 
 Types: [TeamId](subsystems/agent-team.md) · [TeamTaskSnapshot](subsystems/agent-team.md)
 
-Source: [`packages/experimental/agent-team/src/types.ts:223`](../packages/experimental/agent-team/src/types.ts)
+Source: [`packages/experimental/agent-team/src/types.ts:283`](../packages/experimental/agent-team/src/types.ts)
 
 ### `todo/*`
 

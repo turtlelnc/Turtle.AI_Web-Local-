@@ -73,9 +73,29 @@ interface TeamTaskSnapshot {
 
 `pending` 表示尚未开始或已经释放，`in_progress` 携带 owner，`completed` 满足 blocker，`deleted` 是保留的 tombstone。view 会添加 owner name、readiness 和 write-scope 重叠警告，但不会改变持久快照。
 
+## 项目控制
+
+Lead 选择一个带 revision 的内置工作预设，并可配置 Team 级 Token 上限与剩余 Token 警告阈值。`team/project` 保存完整的当前配置；达到本地上限或收到明确的服务商耗尽信号时会追加 paused revision。通过项目配置提高或移除上限会追加新的 active revision。
+
+```ts type-equiv
+/** Whole project configuration stored in the Team Lead Session. */
+interface TeamProjectSnapshot {
+  readonly revision: number
+  readonly name: string
+  readonly presetId: TeamProjectPresetId
+  readonly presetRevision: 'builtin-1'
+  readonly tokenBudget?: TeamTokenBudget
+  readonly phase: 'active' | 'paused'
+  readonly pauseReason?: 'token-budget' | 'provider-limit'
+  readonly provider?: string
+}
+```
+
+`team/member-usage` 保存每个 member 最近一次由服务商报告的累计 Token 总量。汇总值是本地用量保护，不是账户余额，也不预测未公开的 ChatGPT／Codex 限额。project 与 usage record 只存在于日志；工具 adapter 只把所选预设转为模型可见 policy。
+
 ## 回放
 
-`foldTeam()` 把一个 Root Session 回放成每个 Team 操作所读取的 roster、任务板与 queued-minus-delivered mailbox。它按 `TeamId` 选取记录，因此普通 fork 继承的 event 保留 ancestor id，绝不会进入新 Root 的状态。Session event 的 `seq` 与 `time` 继续负责顺序和时间记录，Team snapshot 不再重复保存它们。roster 与 task 读取以 view 形式到达调用方，而 pending 邮件仅供投递与恢复内部使用。包 [README](../../packages/experimental/agent-team/README.zh.md)负责 operation、authorization、recovery 和限制行为。
+`foldTeam()` 把一个 Root Session 回放成每个 Team 操作所读取的 roster、project、member usage、任务板与 queued-minus-delivered mailbox。它按 `TeamId` 选取记录，因此普通 fork 继承的 event 保留 ancestor id，绝不会进入新 Root 的状态。Session event 的 `seq` 与 `time` 继续负责顺序和时间记录，Team snapshot 不再重复保存它们。roster、project 与 task 读取以 view 形式到达调用方，而 pending 邮件仅供投递与恢复内部使用。包 [README](../../packages/experimental/agent-team/README.zh.md)负责 operation、authorization、recovery 和限制行为。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -178,11 +198,26 @@ interrupt(caller: Agent, targetName: string): { previousStatus: 'running' | 'idl
 tryMembership(agent: Agent): TeamMembership | undefined
 
 /**
+ * Return the logged project preset instruction visible to one Team member.
+ * @param agent - exact live Team member.
+ * @returns model-visible working instruction, or undefined before project configuration.
+ */
+projectInstruction(agent: Agent): string | undefined
+
+/**
  * Read the current roster and non-deleted task board through the generated Remote API.
  * @param agent - exact live Team member used as the authority credential.
  * @returns detached current roster and task views.
  */
 @Remote('view') remoteView(agent: Agent): TeamView
+
+/**
+ * Configure one durable project preset and optional local token guard.
+ * @param agent - exact live Lead Agent used as the authority credential.
+ * @param request - project name, built-in preset, and optional local token thresholds.
+ * @returns committed project view or a typed Team rejection.
+ */
+@Remote('configureProject') async remoteConfigureProject( agent: Agent, request: ConfigureTeamProjectRequest, ): Promise<TeamProjectMutationResult>
 
 /**
  * Create one shared task through the generated Remote API.

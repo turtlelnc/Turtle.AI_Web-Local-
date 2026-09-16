@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-`dsh-experimental-agent-team` 把一个编码会话变成一个小型工作团队：会话中的 agent 成为 Lead，创建具名 teammate 处理委派的工作，与它们交换持久消息，并在公共任务板上跟踪共享任务。消息与任务状态能挺过崩溃、reload 与中断，因此离线的 teammate 会在恢复后收到排队的消息。它本身不提供任何工具——请挂载兄弟包 `dsh-experimental-tool-agent-team`，让模型能够创建 teammate、给它们发消息并使用任务板。它是实验性的：不进入正式发布、不承诺稳定性，并且需要持久会话存储才能激活。
+`dsh-experimental-agent-team` 把一个编码会话变成一个小型工作团队：会话中的 agent 成为 Lead，创建具名 teammate 处理委派工作、交换持久消息，并在一个项目预设与可选 Token 保护下跟踪共享任务。消息、项目设置、服务商报告的用量与任务状态都能挺过崩溃、reload 与中断。它本身不提供任何工具——请挂载兄弟包 `dsh-experimental-tool-agent-team`，让模型能够创建 teammate、发送消息并使用任务板。它是实验性的：不进入正式发布、不承诺稳定性，并且需要持久会话存储才能激活。
 
 ## 目录
 
@@ -78,6 +78,14 @@ roster 显示每个成员的职责（`lead` 或 `teammate`）与当前状态：`
 
 当两个 in-progress 任务计划触及重叠路径时，文件提示会产生警告——它们绝不阻止任何操作。已删除任务保留在历史中，但从活动列表中消失。
 
+### 项目预设与 Token 保护
+
+Lead 可以为具名项目配置一种内置工作模式：新产品、改进现有产品、修复问题或自由模式。选择及其 `builtin-1` revision 会持久保存；兄弟工具包把所选模式加入每个 Team member 的 system prompt。
+
+可选的 Team 级 Token 上限汇总每个 member 的 token-meter projection，并在 Lead 日志中持久保存每个 member 最近一次由服务商报告的累计用量。达到上限后，项目会暂停、live Team turn 会在保留 inbox 的情况下取消，后续模型请求会被拒绝，直到 Lead 提高或移除保护。明确的 HTTP 402 或已识别服务商额度耗尽 code 也会暂停已配置项目；普通 HTTP 429 限流不会。
+
+此保护不是账户余额 API。视图把正常测量标为服务商报告用量，把明确的耗尽响应标为服务商限制信号；它绝不虚构剩余货币余额或隐藏的 ChatGPT／Codex 限额。
+
 ### 等待与中断
 
 成员可以等待下一次团队变化——teammate 的状态、新消息或任务更新——而不必反复轮询；等待只报告是否超时，调用方随后重新读取当前状态。
@@ -119,6 +127,7 @@ Lead 可以停止 teammate 的当前轮次，而不会删除其排队的消息�
 | [`src/task-board.ts`](src/task-board.ts) | 任务 CAS 命令、DAG 校验与派生视图 |
 | [`src/journal.ts`](src/journal.ts) | 串行化的 Lead 日志事务与提交通知 |
 | [`src/projection.ts`](src/projection.ts) | 解码并校验 Team 事件的严格回放投影 |
+| [`src/project.ts`](src/project.ts) | 持久项目预设、汇总用量、请求准入与安全暂停 |
 | [`src/activity.ts`](src/activity.ts) | 一次性变更等待者与 dispose 释放 |
 | [`src/lifecycle.ts`](src/lifecycle.ts) | 共享准入截止与有界结算 |
 | [`src/invariant.ts`](src/invariant.ts) | 在 append 前回放候选事件的不变式伴生插件 |
@@ -169,7 +178,7 @@ dispose 会关闭准入、中止并等待已获准的创建与 mailbox dispatch 
 
 ### 浏览器 Remote
 
-`TeamService` 除了 roster、mailbox、task 与 lifecycle operation，还直接负责生成式 `agentTeams/view`、`agentTeams/createTask` 与 `agentTeams/updateTask` Remote method。`./remote` 导出由 Web UI 挂载的 Client contribution，`./client` 则重新导出可在浏览器 compilation face 中安全使用的 request、view 与 task mutation result type。Typert 在外层 `RemoteResult` 中保留 transport failure；create 与 update rejection 则作为 transport 成功响应中的显式 domain result，其中过期的 update revision 会区分为 task conflict。
+`TeamService` 除了 roster、mailbox、task 与 lifecycle operation，还直接负责生成式 `agentTeams/view`、`agentTeams/configureProject`、`agentTeams/createTask` 与 `agentTeams/updateTask` Remote method。`./remote` 导出由 Web UI 挂载的 Client contribution，`./client` 则重新导出浏览器安全的 request、view 与 mutation result type。Typert 在外层 `RemoteResult` 中保留 transport failure；project 与 task rejection 作为 transport 成功响应中的显式 domain result，其中过期的 task revision 会区分为 task conflict。
 
 ## 模型体验
 
@@ -187,6 +196,20 @@ dispose 会关闭准入、中止并等待已获准的创建与 mailbox dispatch 
 
 Peer 消息追加在 target 可复用历史前缀之后。冷恢复会先复用持久对话，再追加尚未投递的消息。
 
+### 项目预设
+
+#### 模型看到什么
+
+所选内置模式会进入每个 Team member 稳定的 Team policy section。project 与 usage event 仍然只存在于日志；只有简洁的工作指令会影响模型 Token。
+
+#### Token 影响
+
+所选模式会在每次 Team request 增加一条短 policy sentence；汇总用量与暂停 record 不增加模型 Token。
+
+#### KV Cache 影响
+
+所选模式在 Lead 写入另一条 project revision 前保持 prefix-stable；变更预设会开始新的可复用 policy prefix。
+
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
@@ -200,6 +223,7 @@ Peer 消息追加在 target 可复用历史前缀之后。冷恢复会先复用�
 - **扁平且不可变的 roster**——只有 Lead 可以创建直接 teammate；不支持嵌套 Team、重命名、删除或名字复用。
 - **不会自动释放 owner**——idle、interrupt、进程退出与工作失败都不会释放任务 owner。
 - **mailbox 不保证跨进程 exactly-once**——不支持多个 harness 进程并发操作同一 Team。
+- **Token 保护不是账户余额**——它测量已配置服务商报告的 Token，并响应明确的耗尽结果；它无法预测未公开的 ChatGPT／Codex 重置时间、credit balance 或货币成本。
 
 <a id="dev-note"></a>
 ### 开发备注
